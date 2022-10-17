@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "hive-rc-auto"
+version = "0.1.0"
+description = "A system for managing RC Resource Credits on Hive"
+authors = ["Brian of London <brian@podping.org>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "hive_rc_auto"}]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.9.7 || >3.9.7,<4.0"
+streamlit = "^1.13.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
