@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import os
+from helpers.test_import import SomeClass
 
 if __name__ == "__main__":
     st.set_page_config(
@@ -18,3 +19,6 @@ if __name__ == "__main__":
     st.code(directory, language="log")
     with open("hive-rc-auto/data/example.log", "r") as f:
         st.code(f.read(), language="log")
+
+    something = SomeClass()
+    print(something.value)
