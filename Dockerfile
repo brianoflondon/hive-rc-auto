@@ -15,6 +15,6 @@ RUN poetry install --no-root --only main
 
 COPY ./src /app/
 
-EXPOSE 8501
+EXPOSE 8505
 
-ENTRYPOINT ["streamlit", "run", "hive-rc-auto/main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run", "hive-rc-auto/main.py", "--server.port=8505", "--server.address=0.0.0.0"]

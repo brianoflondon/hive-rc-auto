@@ -9,8 +9,9 @@
             "type": "python",
             "request": "launch",
             "module": "streamlit",
+            "cwd": "${workspaceFolder}/src/",
             "args": [
-                "run","src/hive-rc-auto/main.py"
+                "run","hive-rc-auto/main.py"
             ],
             "justMyCode": true
         }
