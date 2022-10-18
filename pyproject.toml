@@ -12,6 +12,9 @@ python = ">=3.9,<3.9.7 || >3.9.7,<4.0"
 streamlit = "^1.13.0"
 watchdog = "^2.1.9"
 black = "^22.10.0"
+pydantic = "^1.10.2"
+lighthive = "^0.4.0"
+python-dotenv = "^0.21.0"
 
 
 [tool.poetry.group.dev.dependencies]
