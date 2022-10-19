@@ -1,9 +1,12 @@
+import logging
 from datetime import datetime, timezone
 from enum import Enum
-import logging
-from typing import Any, Callable
+from typing import Any, Callable, List
 
 from pydantic import BaseModel, Field
+
+from hive_rc_auto.helpers.config import Config
+from hive_rc_auto.helpers.hive_calls import get_rcs
 
 
 def mill(input: int) -> int:
@@ -32,6 +35,11 @@ class RCStatus(Enum):
     HIGH = 2
 
 
+class RCAccType(Enum):
+    DELEGATING = 0
+    TARGET = 1
+
+
 class RCAccount(BaseModel):
     timestamp: datetime = Field(
         default=datetime.now(timezone.utc),
@@ -39,6 +47,11 @@ class RCAccount(BaseModel):
         description="Timestamp of RC reading.",
     )
     account: str = Field(None, title="Account Name")
+    delegating: RCAccType = Field(
+        RCAccType.TARGET,
+        title="Delegating",
+        description="Delegating account or target account",
+    )
     rc_manabar: RCManabar = Field(title="RC Manabar")
     max_rc_creation_adjustment: RCCreationAdjustment
     max_rc: int = Field(title="RC Max")
@@ -80,7 +93,7 @@ class RCAccount(BaseModel):
         regenerated_mana = (
             time_since_last.total_seconds()
             * max_mana
-            / VOTING_MANA_REGENERATION_IN_SECONDS
+            / Config.VOTING_MANA_REGENERATION_IN_SECONDS
         )
         __pydantic_self__.real_mana = last_mana + regenerated_mana
         real_mana_percent = __pydantic_self__.real_mana * 100 / max_mana
@@ -89,12 +102,12 @@ class RCAccount(BaseModel):
         )
         # Filter for too_high and too_low
         if (
-            __pydantic_self__.account != DELEGATING_ACCOUNT
+            not __pydantic_self__.account in Config.DELEGATING_ACCOUNTS
             and __pydantic_self__.received_delegated_rc
-            and real_mana_percent > RC_PCT_UPPER_TARGET
+            and real_mana_percent > Config.RC_PCT_UPPER_TARGET
         ):
             __pydantic_self__.status = RCStatus.HIGH
-        elif real_mana_percent < RC_PCT_LOWER_TARGET:
+        elif real_mana_percent < Config.RC_PCT_LOWER_TARGET:
             __pydantic_self__.status = RCStatus.LOW
         else:
             __pydantic_self__.status = RCStatus.OK
@@ -105,17 +118,18 @@ class RCAccount(BaseModel):
             else 0.0
         )
         # Extrapolate RC Delta to 1 hour
-        __pydantic_self__.delta_percent *= 3600 / UPDATE_FREQUENCY_MINS
+        __pydantic_self__.delta_percent *= 3600 / Config.UPDATE_FREQUENCY_SECS
 
         if (
             __pydantic_self__.real_mana_percent + __pydantic_self__.delta_percent
-            < RC_PCT_ALARM_LEVEL
+            < Config.RC_PCT_ALARM_LEVEL
         ):
             __pydantic_self__.alarm_set = True
 
         __pydantic_self__.rc_deleg_available = __pydantic_self__.real_mana - (
-            RC_BASE_LEVEL + __pydantic_self__.received_delegated_rc
+            Config.RC_BASE_LEVEL + __pydantic_self__.received_delegated_rc
         )
+        __pydantic_self__.log_line_output(logging.info)
 
     @property
     def delta_icon(self) -> str:
@@ -189,3 +203,30 @@ class RCDirectDelegation(BaseModel):
                 "max_rc": self.delegated_rc,
             },
         ]
+
+
+async def find_rc_accounts(
+    check_accounts: List[str], old_all_rcs: List[RCAccount] = None
+) -> List[RCAccount]:
+    """
+    Performs the lookup and fills in the RC data for all accounts
+    """
+
+    response = get_rcs(check_accounts)
+    old_current_percents = (
+        {i.account: i.real_mana_percent for i in old_all_rcs} if old_all_rcs else None
+    )
+    ans: List[RCAccount] = []
+    if rc_accounts := response.get("rc_accounts"):
+        for a in rc_accounts:
+            if old_current_percents:  # and old_current_percents[a.get("account")]:
+                a["old_mana_percent"] = old_current_percents[a.get("account")]
+
+            a["delegating"] = (
+                RCAccType.DELEGATING
+                if a["account"] in Config.DELEGATING_ACCOUNTS
+                else RCAccType.TARGET
+            )
+            ans.append(RCAccount.parse_obj(a))
+
+    return ans

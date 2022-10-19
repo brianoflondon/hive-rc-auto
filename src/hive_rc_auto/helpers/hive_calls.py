@@ -8,7 +8,9 @@ from lighthive.exceptions import RPCNodeException
 from lighthive.helpers.account import VOTING_MANA_REGENERATION_IN_SECONDS
 from lighthive.node_picker import compare_nodes
 
-from helpers.config import Config
+from hive_rc_auto.helpers.config import Config
+
+Config.VOTING_MANA_REGENERATION_IN_SECONDS = VOTING_MANA_REGENERATION_IN_SECONDS
 
 def get_client(
     posting_keys: Optional[List[str]] = None,
@@ -68,3 +70,18 @@ def tracking_accounts(
     except Exception as ex:
         logging.error(ex)
         return []
+
+
+def get_rcs(check_accounts: List[str]) -> dict:
+    """"
+    Calls hive with the `find_rc_accounts` method
+    """
+    client_rc = get_client(api_type="rc_api")
+    try:
+        response = client_rc.find_rc_accounts({"accounts": check_accounts})
+        return response
+    except Exception as ex:
+        logging.error(
+            f"{client_rc.current_node} {client_rc.api_type} not returning useful results, can't continue"
+        )
+        raise ex

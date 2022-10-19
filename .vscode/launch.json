@@ -11,7 +11,7 @@
             "module": "streamlit",
             "cwd": "${workspaceFolder}/src/",
             "args": [
-                "run","hive-rc-auto/main.py"
+                "run","hive_rc_auto/main.py"
             ],
             "justMyCode": true
         }

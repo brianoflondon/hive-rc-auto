@@ -13,8 +13,8 @@ class Config:
         DELEGATING_ACCOUNTS: List[str] = os.getenv("DELEGATING_ACCOUNTS").split(",")
 
         POSTING_KEY: str = os.getenv("HIVE_POSTING_KEY")
-        UPDATE_FREQUENCY_MINS: int = int(
-            os.getenv("UPDATE_FREQUENCY_MINS")
+        UPDATE_FREQUENCY_SECS: int = int(
+            os.getenv("UPDATE_FREQUENCY_SECS")
         )  # in Minutes
 
         RC_BASE_LEVEL: int = int(os.getenv("RC_BASE_LEVEL"))
