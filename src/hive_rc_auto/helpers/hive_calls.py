@@ -148,11 +148,14 @@ def get_rcs(check_accounts: List[str]) -> dict:
     )
 
 
-def make_lighthive_call(client: Client, call_to_make: Callable, params: Any):
+def make_lighthive_call(client: Client, call_to_make: Callable, params: Any = None):
     counter = len(client.node_list)
     while counter > 0:
         try:
-            response = call_to_make(params)
+            if params:
+                response = call_to_make(params)
+            else:
+                response = call_to_make()
             return response
         except Exception as ex:
             logging.error(

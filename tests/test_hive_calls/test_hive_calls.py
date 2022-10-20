@@ -5,6 +5,7 @@ from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
     get_client,
     get_delegated_posting_auth_accounts,
+    make_lighthive_call,
 )
 from lighthive.node_picker import compare_nodes
 
@@ -16,10 +17,14 @@ async def test_get_client():
     client = get_client(nodes=new_list)
     try:
         first_node = client.current_node
-        client.next_node()
-        while not client.current_node == first_node:
-            props = client.get_dynamic_global_properties()
+        while True:
+            props = make_lighthive_call(
+                client=client, call_to_make=client.get_dynamic_global_properties
+            )
+            logging.info(f"{client.current_node} - {props.get('head_block_number')}")
             client.next_node()
+            if client.current_node == first_node:
+                break
     except Exception as ex:
         assert False
 
