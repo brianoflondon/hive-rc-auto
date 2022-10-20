@@ -1,12 +1,23 @@
+import json
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, List
-
-from pydantic import BaseModel, Field
+from typing import Any, Callable, List, Union
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.hive_calls import get_rcs
+from hive_rc_auto.helpers.hive_calls import get_client, get_rcs, get_tracking_accounts, get_delegated_posting_auth_accounts
+from pydantic import BaseModel, Field
+
+
+class RCStatus(Enum):
+    OK = 0
+    LOW = 1
+    HIGH = 2
+
+
+class RCAccType(Enum):
+    DELEGATING = 0
+    TARGET = 1
 
 
 def mill(input: int) -> int:
@@ -29,15 +40,21 @@ class RCCreationAdjustment(BaseModel):
         return self.amount / (10 * self.precision)
 
 
-class RCStatus(Enum):
-    OK = 0
-    LOW = 1
-    HIGH = 2
+class RCDirectDelegation(BaseModel):
+    acc_from: str = Field(None, alias="from")
+    acc_to: str = Field(None, alias="to")
+    delegated_rc: int = 0
 
-
-class RCAccType(Enum):
-    DELEGATING = 0
-    TARGET = 1
+    @property
+    def payload_item(self):
+        return [
+            "delegate_rc",
+            {
+                "from": self.acc_from,
+                "delegatees": [self.acc_to],
+                "max_rc": self.delegated_rc,
+            },
+        ]
 
 
 class RCAccount(BaseModel):
@@ -81,6 +98,16 @@ class RCAccount(BaseModel):
     status: RCStatus = 0
     alarm_set: bool = Field(
         False, title="Alarm", description="Flag for raising an alarm."
+    )
+    deleg_out: List[Any] = Field(
+        [],
+        title="Delegations made",
+        description="Outgoing delegations from this account",
+    )
+    deleg_recv: List[Any] = Field(
+        [],
+        title="Delegations made",
+        description="Outgoing delegations from this account",
     )
 
     def __init__(__pydantic_self__, **data: Any) -> None:
@@ -151,6 +178,9 @@ class RCAccount(BaseModel):
     def rc_percent(self):
         return self.rc * 100
 
+    async def fill_delegations(self):
+        self.deleg_out = await list_rc_direct_delegations(self.account)
+
     def log_output(self):
         logging.info(f"{self.account:<16} ---------------------------------------- ")
         logging.info(f"  % | {self.rc_percent:>5.2f} ")
@@ -205,7 +235,34 @@ class RCDirectDelegation(BaseModel):
         ]
 
 
-async def find_rc_accounts(
+class RCAllData(BaseModel):
+    timestamp: datetime = Field(
+        default=datetime.now(timezone.utc),
+        title="Timestamp",
+        description="Timestamp of All readings.",
+    )
+    rcs: List[RCAccount] = Field(
+        [], title="All RC Accounts", description="All the tracked accounts RC details"
+    )
+    accounts: List[str] = Field(
+        [],
+        title="List of accounts",
+        description="List of accounts in the same order as the rcs data",
+    )
+
+    def __init__(__pydantic_self__, **data: Any) -> None:
+        super().__init__(**data)
+
+    async def fill_data(self):
+        """
+        Fills in the data
+        """
+        tracking = get_tracking_accounts()
+        delegated = await get_delegated_posting_auth_accounts()
+
+
+
+async def get_rc_of_accounts(
     check_accounts: List[str], old_all_rcs: List[RCAccount] = None
 ) -> List[RCAccount]:
     """
@@ -228,5 +285,41 @@ async def find_rc_accounts(
                 else RCAccType.TARGET
             )
             ans.append(RCAccount.parse_obj(a))
-
     return ans
+
+
+async def get_rc_of_one_account(
+    check_account: str, old_rc: RCAccount = None
+) -> Union[RCAccount, None]:
+    """
+    Return the RCAccount status of one account
+    """
+    if old_rc:
+        ans = await get_rc_of_accounts([check_account], [old_rc])
+    else:
+        ans = await get_rc_of_accounts([check_account])
+    if ans:
+        return ans[0]
+    return None
+
+
+async def list_rc_direct_delegations(
+    acc_from: str, acc_to: str = "", limit: int = 100
+) -> List[RCDirectDelegation]:
+    """
+    Returns all RC Delegations from this account optionaly to the second
+    one
+    https://peakd.com/rc/@howo/direct-rc-delegation-documentation
+    """
+    client_rc = get_client(api_type="rc_api")
+    query = {"start": [acc_from, acc_to], "limit": limit}
+    logging.info(json.dumps(query))
+    response = client_rc.list_rc_direct_delegations(query)
+    logging.info(response.get("rc_direct_delegations"))
+    if response.get("rc_direct_delegations"):
+        ans = [
+            RCDirectDelegation.parse_obj(res)
+            for res in response.get("rc_direct_delegations")
+        ]
+        return ans
+    return []

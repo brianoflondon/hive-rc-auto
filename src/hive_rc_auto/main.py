@@ -13,13 +13,18 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.hive_calls import tracking_accounts
-from hive_rc_auto.helpers.rc_delegation import RCAccount, RCAccType, RCManabar, find_rc_accounts
+from hive_rc_auto.helpers.hive_calls import get_tracking_accounts
+from hive_rc_auto.helpers.rc_delegation import (
+    RCAccount,
+    RCAccType,
+    RCManabar,
+    get_rc_of_accounts,
+)
 
 
 @st.experimental_memo
-def get_tracking_accounts() -> List[str]:
-    ta = tracking_accounts()
+def tracking_accounts() -> List[str]:
+    ta = get_tracking_accounts()
     return ta
 
 
@@ -28,9 +33,9 @@ async def fill_rc_list(old_all_rcs: List[RCAccount]) -> List[RCAccount]:
     Returns two lists of RC objects one for the delegating and one for
     the target accounts
     """
-    ta = get_tracking_accounts()
+    ta = tracking_accounts()
 
-    all_rcs = await find_rc_accounts(
+    all_rcs = await get_rc_of_accounts(
         check_accounts=Config.DELEGATING_ACCOUNTS + ta, old_all_rcs=old_all_rcs
     )
     return all_rcs
@@ -115,18 +120,14 @@ async def main_loop(old_all_rcs=None):
     logging.info("Running again")
     old_all_rcs = all_rcs
 
-    # for acc in tracking_accounts:
-    #     st.metric(label=acc, value="23 %", delta="1.2 %")
-    # await asyncio.sleep(10)
-
 
 if __name__ == "__main__":
-    debug = False
-    logging.basicConfig(
-        level=logging.INFO if not debug else logging.DEBUG,
-        format="%(asctime)s %(levelname)-8s %(module)-14s %(lineno) 5d : %(message)s",
-        datefmt="%m-%dT%H:%M:%S",
-    )
+    # debug = False
+    # logging.basicConfig(
+    #     level=logging.INFO if not debug else logging.DEBUG,
+    #     format="%(asctime)s %(levelname)-8s %(module)-14s %(lineno) 5d : %(message)s",
+    #     datefmt="%m-%dT%H:%M:%S",
+    # )
     logging.info("----------------------------------------")
     logging.info(f"Running at {datetime.now()}")
     logging.info(f"Testnet: {os.getenv('TESTNET')}")

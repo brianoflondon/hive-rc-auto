@@ -17,6 +17,7 @@ python-dotenv = "^0.21.0"
 streamlit-autorefresh = "^0.0.1"
 plotly = "^5.10.0"
 single-source = "^0.3.0"
+pymssql = "^2.2.5"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -27,3 +28,9 @@ pytest-asyncio = "^0.19.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"

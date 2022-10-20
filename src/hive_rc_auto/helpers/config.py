@@ -8,8 +8,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+debug = False
+logging.basicConfig(
+    level=logging.INFO if not debug else logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(module)-14s %(lineno) 5d : %(message)s",
+    datefmt="%m-%dT%H:%M:%S",
+)
+
 class Config:
     try:
+        PRIMARY_ACCOUNT: str = os.getenv('PRIMARY_ACCOUNT')
         DELEGATING_ACCOUNTS: List[str] = os.getenv("DELEGATING_ACCOUNTS").split(",")
 
         POSTING_KEY: str = os.getenv("HIVE_POSTING_KEY")
