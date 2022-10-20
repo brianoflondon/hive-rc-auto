@@ -5,7 +5,13 @@ from enum import Enum
 from typing import Any, Callable, List, Union
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.hive_calls import get_client, get_rcs, get_tracking_accounts, get_delegated_posting_auth_accounts
+from hive_rc_auto.helpers.hive_calls import (
+    get_client,
+    get_delegated_posting_auth_accounts,
+    get_rcs,
+    get_tracking_accounts,
+    make_lighthive_call,
+)
 from pydantic import BaseModel, Field
 
 
@@ -235,6 +241,17 @@ class RCDirectDelegation(BaseModel):
         ]
 
 
+class RCListOfAccounts(BaseModel):
+    accounts: List[str]
+
+    def __init__(__pydantic_self__, primary_account=Config.PRIMARY_ACCOUNT, **data: Any) -> None:
+        if not data.get("accounts"):
+            data["accounts"] = (
+                get_delegated_posting_auth_accounts(primary_account) + get_tracking_accounts(primary_account)
+            )
+        super().__init__(**data)
+
+
 class RCAllData(BaseModel):
     timestamp: datetime = Field(
         default=datetime.now(timezone.utc),
@@ -253,13 +270,13 @@ class RCAllData(BaseModel):
     def __init__(__pydantic_self__, **data: Any) -> None:
         super().__init__(**data)
 
-    async def fill_data(self):
+    async def fill_data(self, old_all_rcs: List[RCAccount] = None):
         """
         Fills in the data
         """
-        tracking = get_tracking_accounts()
-        delegated = await get_delegated_posting_auth_accounts()
-
+        self.rcs = await get_rc_of_accounts(self.accounts, old_all_rcs=old_all_rcs)
+        self.timestamp = datetime.now(timezone.utc)
+        pass
 
 
 async def get_rc_of_accounts(
@@ -313,9 +330,11 @@ async def list_rc_direct_delegations(
     """
     client_rc = get_client(api_type="rc_api")
     query = {"start": [acc_from, acc_to], "limit": limit}
-    logging.info(json.dumps(query))
-    response = client_rc.list_rc_direct_delegations(query)
-    logging.info(response.get("rc_direct_delegations"))
+    response = make_lighthive_call(
+        client=client_rc,
+        call_to_make=client_rc.list_rc_direct_delegations,
+        params=query,
+    )
     if response.get("rc_direct_delegations"):
         ans = [
             RCDirectDelegation.parse_obj(res)

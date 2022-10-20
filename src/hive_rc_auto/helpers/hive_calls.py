@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 import backoff
 import pymssql
@@ -60,7 +60,7 @@ def get_client(
         raise ex
 
 
-async def get_delegated_posting_auth_accounts(
+def get_delegated_posting_auth_accounts(
     primary_account=Config.PRIMARY_ACCOUNT,
 ) -> List[str]:
     """
@@ -127,7 +127,7 @@ def get_tracking_accounts(
     except RPCNodeException as ex:
         logging.error("Failure to find following accounts, trying normal APIs")
         logging.error(ex)
-        client = Client()
+        client.next_node()
         hive_acc = client.account(primary_account)
         following = sorted(hive_acc.following())
         return following
@@ -141,11 +141,26 @@ def get_rcs(check_accounts: List[str]) -> dict:
     Calls hive with the `find_rc_accounts` method
     """
     client_rc = get_client(api_type="rc_api")
-    try:
-        response = client_rc.find_rc_accounts({"accounts": check_accounts})
-        return response
-    except Exception as ex:
-        logging.error(
-            f"{client_rc.current_node} {client_rc.api_type} not returning useful results, can't continue"
-        )
-        raise ex
+    return make_lighthive_call(
+        client=client_rc,
+        call_to_make=client_rc.find_rc_accounts,
+        params=({"accounts": check_accounts}),
+    )
+
+
+def make_lighthive_call(client: Client, call_to_make: Callable, params: Any):
+    counter = len(client.node_list)
+    while counter > 0:
+        try:
+            response = call_to_make(params)
+            return response
+        except Exception as ex:
+            logging.error(
+                f"{client.current_node} {client.api_type} not returning useful results"
+            )
+            client.next_node()
+            logging.warning(
+                f"{client.current_node} trying"
+            )
+            counter -= 1
+    raise Exception("Everything failed")

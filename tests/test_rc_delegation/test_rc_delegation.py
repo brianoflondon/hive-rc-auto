@@ -2,6 +2,8 @@ import asyncio
 
 import pytest
 from hive_rc_auto.helpers.rc_delegation import (
+    RCAllData,
+    RCListOfAccounts,
     get_rc_of_accounts,
     get_rc_of_one_account,
     list_rc_direct_delegations,
@@ -41,3 +43,51 @@ async def test_get_rc_of_one_account():
     podping_rc = await get_rc_of_one_account(check_account="podping")
     podping_rc = await get_rc_of_one_account(check_account="podping", old_rc=podping_rc)
     assert podping_rc.account == "podping"
+
+@pytest.mark.slow
+def test_get_rc_list_of_accounts():
+    all_accounts = RCListOfAccounts()
+    assert len(all_accounts.accounts) > 2
+
+
+@pytest.mark.asyncio
+async def test_RCAllData_fill_data():
+    all_accounts = RCListOfAccounts(
+        accounts=[
+            "podping",
+            "brianoflondon",
+            "v4vapp.dhf",
+            "adam.podping",
+            "alecksgates",
+            "andih",
+            "benjaminbellamy",
+            "blocktvnews",
+            "dudesanddads",
+            "hive-hydra",
+            "hivehydra",
+            "learn-to-code",
+            "phoneboy",
+            "podnews",
+            "podping-git",
+            "podping.aaa",
+            "podping.adam",
+            "podping.bbb",
+            "podping.blubrry",
+            "podping.bol",
+            "podping.ccc",
+            "podping.curio",
+            "podping.ddd",
+            "podping.eee",
+            "podping.gittest",
+            "podping.live",
+            "podping.podverse",
+            "podping.spk",
+            "podping.test",
+            "podping.win",
+        ]
+    )
+    all_data = RCAllData(accounts=all_accounts.accounts)
+    await all_data.fill_data()
+    await asyncio.sleep(5)
+    await all_data.fill_data(old_all_rcs=all_data.rcs)
+    assert all_data

@@ -1,6 +1,7 @@
 import logging
-from hive_rc_auto.helpers.config import Config
+
 import pytest
+from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
     get_client,
     get_delegated_posting_auth_accounts,
@@ -27,12 +28,7 @@ async def test_get_client():
 
 @pytest.mark.asyncio
 async def test_get_delegated_posting_auth_accounts():
-    delegating_accounts = await get_delegated_posting_auth_accounts()
+    delegating_accounts = get_delegated_posting_auth_accounts()
     assert delegating_accounts[0] == Config.PRIMARY_ACCOUNT
-    delegating_accounts = await get_delegated_posting_auth_accounts("brianoflondon")
+    delegating_accounts = get_delegated_posting_auth_accounts("brianoflondon")
     assert delegating_accounts
-
-
-@pytest.mark.asyncio
-async def test_RCAllData_fill_data():
-    pass
