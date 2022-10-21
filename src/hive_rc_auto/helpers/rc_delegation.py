@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from enum import Enum
+from tabnanny import check
 from typing import Any, Callable, List, Union
 
 from hive_rc_auto.helpers.config import Config
@@ -26,9 +27,14 @@ class RCAccType(Enum):
     TARGET = 1
 
 
-def mill(input: int) -> int:
+def mill(input: float) -> int:
     """Divide by 1 million"""
     return round(input / 1e6)
+
+
+def mill_s(input: float) -> str:
+    m = mill(input)
+    return f"{m:>12,} M"
 
 
 class RCManabar(BaseModel):
@@ -105,7 +111,7 @@ class RCAccount(BaseModel):
     alarm_set: bool = Field(
         False, title="Alarm", description="Flag for raising an alarm."
     )
-    deleg_out: List[Any] = Field(
+    deleg_out: List[RCDirectDelegation] = Field(
         [],
         title="Delegations made",
         description="Outgoing delegations from this account",
@@ -118,6 +124,10 @@ class RCAccount(BaseModel):
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         super().__init__(**data)
+        if data.get("deleg_out"):
+            # Handle correct transfer of mutable strings
+            __pydantic_self__.deleg_out = data["deleg_out"].copy()
+
         # Calculate real_mana (RC) as a percentage allowing for regeneration
         last_mana = __pydantic_self__.rc_manabar.current_mana
         max_mana = __pydantic_self__.max_rc
@@ -240,19 +250,32 @@ class RCDirectDelegation(BaseModel):
             },
         ]
 
+    def log_line_output(self, logger: Callable):
+        logger(
+            f"{self.acc_from:<16} -> {self.acc_to} | "
+            f"{mill(self.delegated_rc):>12,} M"
+        )
+
 
 class RCListOfAccounts(BaseModel):
-    accounts: List[str]
+    all: List[str] = []
+    delegating: List[str] = []
+    receiving: List[str] = []
 
-    def __init__(__pydantic_self__, primary_account=Config.PRIMARY_ACCOUNT, **data: Any) -> None:
-        if not data.get("accounts"):
-            data["accounts"] = (
-                get_delegated_posting_auth_accounts(primary_account) + get_tracking_accounts(primary_account)
-            )
-        super().__init__(**data)
+    def __init__(__pydantic_self__, primary_account=Config.PRIMARY_ACCOUNT) -> None:
+        # Slow and expensive operation. Run on startup and rarely.
+        super().__init__()
+        __pydantic_self__.delegating = get_delegated_posting_auth_accounts(
+            primary_account
+        )
+        __pydantic_self__.receiving = get_tracking_accounts(primary_account)
+        __pydantic_self__.all = (
+            __pydantic_self__.delegating + __pydantic_self__.receiving
+        )
 
 
 class RCAllData(BaseModel):
+
     timestamp: datetime = Field(
         default=datetime.now(timezone.utc),
         title="Timestamp",
@@ -261,11 +284,7 @@ class RCAllData(BaseModel):
     rcs: List[RCAccount] = Field(
         [], title="All RC Accounts", description="All the tracked accounts RC details"
     )
-    accounts: List[str] = Field(
-        [],
-        title="List of accounts",
-        description="List of accounts in the same order as the rcs data",
-    )
+    accounts: RCListOfAccounts
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         super().__init__(**data)
@@ -274,19 +293,55 @@ class RCAllData(BaseModel):
         """
         Fills in the data
         """
-        self.rcs = await get_rc_of_accounts(self.accounts, old_all_rcs=old_all_rcs)
         self.timestamp = datetime.now(timezone.utc)
+        self.rcs = await get_rc_of_accounts(self.accounts, old_all_rcs=old_all_rcs)
         pass
+
+    def _get_rcs(self, account: str) -> RCAccount:
+        return [rc for rc in self.rcs if rc.account == account][0]
+
+    def _get_inbound_delegations(self, account: str) -> List[RCDirectDelegation]:
+        dd_all = []
+        for acc in self.accounts.delegating:
+            rc = self._get_rcs(acc)
+            dd_all += [dd for dd in rc.deleg_out if dd.acc_to == account]
+        return dd_all
+
+    async def which_account_to_delegate_from(self, target: str, amount: int) -> str:
+        """
+        Takes in a target account name and an amount and returns which delegating account
+        has enough RC to fulfill the delegation.
+        """
+        rc = self._get_rcs(target)
+        dd_list = self._get_inbound_delegations(target)
+
+        logging.debug(f"Account: {target}")
+        [dd.log_line_output(logging.debug) for dd in dd_list]
+
+        for delegator in self.accounts.delegating:
+            dd_from = [dd for dd in dd_list if dd.acc_from == delegator]
+            if dd_from:
+                amount -= dd_from[0].delegated_rc
+            rc_real_mana = self._get_rcs(delegator).real_mana
+            logging.debug(
+                f"Checking: {delegator:<16} | "
+                f"{mill_s(rc_real_mana)} - {mill_s(amount)} "
+                f"= {mill_s(rc_real_mana-amount)}"
+            )
+            if self._get_rcs(delegator).real_mana > amount:
+                return delegator
+
+        return "Not enough RCs"
 
 
 async def get_rc_of_accounts(
-    check_accounts: List[str], old_all_rcs: List[RCAccount] = None
+    check_accounts: RCListOfAccounts, old_all_rcs: List[RCAccount] = None
 ) -> List[RCAccount]:
     """
     Performs the lookup and fills in the RC data for all accounts
     """
 
-    response = get_rcs(check_accounts)
+    response = get_rcs(check_accounts.all)
     old_current_percents = (
         {i.account: i.real_mana_percent for i in old_all_rcs} if old_all_rcs else None
     )
@@ -296,28 +351,31 @@ async def get_rc_of_accounts(
             if old_current_percents:  # and old_current_percents[a.get("account")]:
                 a["old_mana_percent"] = old_current_percents[a.get("account")]
 
-            a["delegating"] = (
-                RCAccType.DELEGATING
-                if a["account"] in Config.DELEGATING_ACCOUNTS
-                else RCAccType.TARGET
-            )
+            if a["account"] in check_accounts.delegating:
+                # Now fill in delegations FROM all delegating accounts
+                dd_list = await list_rc_direct_delegations(a["account"])
+                a["deleg_out"] = dd_list
+                [dd.log_line_output(logging.info) for dd in dd_list]
+                a["delegating"] = RCAccType.DELEGATING
+            else:
+                a["delegating"] = RCAccType.TARGET
             ans.append(RCAccount.parse_obj(a))
     return ans
 
 
-async def get_rc_of_one_account(
-    check_account: str, old_rc: RCAccount = None
-) -> Union[RCAccount, None]:
-    """
-    Return the RCAccount status of one account
-    """
-    if old_rc:
-        ans = await get_rc_of_accounts([check_account], [old_rc])
-    else:
-        ans = await get_rc_of_accounts([check_account])
-    if ans:
-        return ans[0]
-    return None
+# async def get_rc_of_one_account(
+#     check_account: str, old_rc: RCAccount = None
+# ) -> Union[RCAccount, None]:
+#     """
+#     Return the RCAccount status of one account
+#     """
+#     if old_rc:
+#         ans = await get_rc_of_accounts([check_account], [old_rc])
+#     else:
+#         ans = await get_rc_of_accounts([check_account])
+#     if ans:
+#         return ans[0]
+#     return None
 
 
 async def list_rc_direct_delegations(

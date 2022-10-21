@@ -1,5 +1,6 @@
 import logging
 import os
+from random import shuffle
 from typing import Any, Callable, List, Optional, Union
 
 import backoff
@@ -32,14 +33,15 @@ def get_client(
         ):
             nodes = [os.getenv("PODPING_TESTNET_NODE")]
             chain = {"chain_id": os.getenv("PODPING_TESTNET_CHAINID")}
-        # else:
-        #     nodes = [
-        #         "https://api.hive.blog",
-        #         "https://api.deathwing.me",
-        #         "https://hive-api.arcange.eu",
-        #         "https://api.openhive.network",
-        #         "https://api.hive.blue",
-        #     ]
+        else:
+            nodes = [
+                "https://hived.emre.sh",
+                "https://api.hive.blog",
+                "https://api.deathwing.me",
+                "https://hive-api.arcange.eu",
+                "https://api.openhive.network",
+                " https://rpc.ausbit.dev",
+            ]
         client = Client(
             keys=posting_keys,
             nodes=nodes,
@@ -121,9 +123,14 @@ def get_tracking_accounts(
     if not client:
         client = get_client()
 
-    hive_acc = client.account(primary_account)
-    return make_lighthive_call(client=client,call_to_make=hive_acc.following)
-
+    hive_acc = make_lighthive_call(
+        client=client, call_to_make=client.account, params=primary_account
+    )
+    # try:
+    #     hive_acc = client.account(primary_account)
+    # except Exception as e:
+    #     logging.error(e)
+    return make_lighthive_call(client=client, call_to_make=hive_acc.following)
 
 
 def get_rcs(check_accounts: List[str]) -> dict:
@@ -149,11 +156,9 @@ def make_lighthive_call(client: Client, call_to_make: Callable, params: Any = No
             return response
         except Exception as ex:
             logging.error(
-                f"{client.current_node} {client.api_type} not returning useful results"
+                f"{client.current_node} {client.api_type} Failing: {ex}"
             )
             client.next_node()
-            logging.warning(
-                f"{client.current_node} trying"
-            )
+            logging.warning(f"Trying new node: {client.current_node}")
             counter -= 1
     raise Exception("Everything failed")

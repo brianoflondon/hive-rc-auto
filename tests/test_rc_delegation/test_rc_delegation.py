@@ -1,13 +1,14 @@
 import asyncio
+import logging
 
 import pytest
 from hive_rc_auto.helpers.rc_delegation import (
     RCAllData,
     RCListOfAccounts,
     get_rc_of_accounts,
-    get_rc_of_one_account,
     list_rc_direct_delegations,
     mill,
+    mill_s,
 )
 
 
@@ -38,56 +39,34 @@ async def test_list_rc_direct_delegations():
     assert deleg_list[1] == deleg_list2[0]
 
 
-@pytest.mark.asyncio
-async def test_get_rc_of_one_account():
-    podping_rc = await get_rc_of_one_account(check_account="podping")
-    podping_rc = await get_rc_of_one_account(check_account="podping", old_rc=podping_rc)
-    assert podping_rc.account == "podping"
+# @pytest.mark.asyncio
+# async def test_get_rc_of_one_account():
+#     podping_rc = await get_rc_of_one_account(check_account="podping")
+#     podping_rc = await get_rc_of_one_account(check_account="podping", old_rc=podping_rc)
+#     assert podping_rc.account == "podping"
+
 
 @pytest.mark.slow
-def test_get_rc_list_of_accounts():
-    all_accounts = RCListOfAccounts()
-    assert len(all_accounts.accounts) > 2
-
-
 @pytest.mark.asyncio
-async def test_RCAllData_fill_data():
-    all_accounts = RCListOfAccounts(
-        accounts=[
-            "podping",
-            "brianoflondon",
-            "v4vapp.dhf",
-            "adam.podping",
-            "alecksgates",
-            "andih",
-            "benjaminbellamy",
-            "blocktvnews",
-            "dudesanddads",
-            "hive-hydra",
-            "hivehydra",
-            "learn-to-code",
-            "phoneboy",
-            "podnews",
-            "podping-git",
-            "podping.aaa",
-            "podping.adam",
-            "podping.bbb",
-            "podping.blubrry",
-            "podping.bol",
-            "podping.ccc",
-            "podping.curio",
-            "podping.ddd",
-            "podping.eee",
-            "podping.gittest",
-            "podping.live",
-            "podping.podverse",
-            "podping.spk",
-            "podping.test",
-            "podping.win",
-        ]
-    )
-    all_data = RCAllData(accounts=all_accounts.accounts)
+async def test_get_rc_list_of_accounts_and_fill_data():
+    # Find all the accounts
+    all_accounts = RCListOfAccounts()
+    assert len(all_accounts.all) > 0
+    assert len(all_accounts.delegating) + len(all_accounts.receiving) > 0
+    # Fill all the data
+    all_data = RCAllData(accounts=all_accounts)
     await all_data.fill_data()
-    await asyncio.sleep(5)
+    await asyncio.sleep(0.5)
+    # Fill update the data
     await all_data.fill_data(old_all_rcs=all_data.rcs)
     assert all_data
+
+    # Check for which account should delegate.
+    amount_range = [1e9, 1e10, 1e11, 1.5e12, 3e12, 4e12, 5e12, 7e12, 1e13, 1e14, 1e15]
+    for acc in all_accounts.receiving:
+        for amount in amount_range:
+            answer = await all_data.which_account_to_delegate_from(
+                target=acc, amount=amount
+            )
+            logging.info(f"{answer:>16} -> {acc:>16} | {mill_s(amount)}")
+            pass
