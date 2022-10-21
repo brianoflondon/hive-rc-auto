@@ -120,20 +120,10 @@ def get_tracking_accounts(
     """
     if not client:
         client = get_client()
-    try:
-        hive_acc = client.account(primary_account)
-        following = sorted(hive_acc.following())
-        return following
-    except RPCNodeException as ex:
-        logging.error("Failure to find following accounts, trying normal APIs")
-        logging.error(ex)
-        client.next_node()
-        hive_acc = client.account(primary_account)
-        following = sorted(hive_acc.following())
-        return following
-    except Exception as ex:
-        logging.error(ex)
-        return []
+
+    hive_acc = client.account(primary_account)
+    return make_lighthive_call(client=client,call_to_make=hive_acc.following)
+
 
 
 def get_rcs(check_accounts: List[str]) -> dict:

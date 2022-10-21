@@ -325,7 +325,7 @@ async def list_rc_direct_delegations(
 ) -> List[RCDirectDelegation]:
     """
     Returns all RC Delegations from this account optionaly to the second
-    one
+    one. If you want a delegation from one account to another only, set limit =1
     https://peakd.com/rc/@howo/direct-rc-delegation-documentation
     """
     client_rc = get_client(api_type="rc_api")

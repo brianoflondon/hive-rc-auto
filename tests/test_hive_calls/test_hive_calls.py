@@ -1,12 +1,17 @@
 import logging
+import os
+import subprocess
+from timeit import default_timer as timer
 
 import pytest
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
     get_client,
     get_delegated_posting_auth_accounts,
+    get_tracking_accounts,
     make_lighthive_call,
 )
+# from hived_rpc_scanner.runner import runner
 from lighthive.node_picker import compare_nodes
 
 
@@ -31,9 +36,24 @@ async def test_get_client():
     assert True
 
 
+def test_get_tracking_accounts():
+    ans = get_tracking_accounts()
+    assert ans
+
+
 @pytest.mark.asyncio
 async def test_get_delegated_posting_auth_accounts():
     delegating_accounts = get_delegated_posting_auth_accounts()
     assert delegating_accounts[0] == Config.PRIMARY_ACCOUNT
     delegating_accounts = get_delegated_posting_auth_accounts("brianoflondon")
     assert delegating_accounts
+
+
+@pytest.mark.asyncio
+async def test_check_all_rpc_nodes():
+    client = get_client()
+    start_time = timer()
+    nodes = [n for n in client.node_list]
+    logging.info(f"hived_rpc_scanner --nodes {' '.join(nodes)}")
+    nodes = "https://rpc.ecency.com"
+    
