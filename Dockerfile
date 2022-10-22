@@ -17,6 +17,6 @@ COPY ./src /app/
 
 # EXPOSE 8505
 
-# CMD ["python", "bot.py"]
+
 # ENTRYPOINT ["hive_rc_auto/bot.py"]
 # ENTRYPOINT ["streamlit", "run", "hive_rc_auto/main.py", "--server.port=8505", "--server.address=0.0.0.0"]

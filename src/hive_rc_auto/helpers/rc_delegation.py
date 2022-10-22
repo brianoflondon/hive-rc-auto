@@ -172,7 +172,6 @@ class RCAccount(BaseModel):
         __pydantic_self__.rc_deleg_available = __pydantic_self__.real_mana - (
             Config.RC_BASE_LEVEL + __pydantic_self__.received_delegated_rc
         )
-        __pydantic_self__.log_line_output(logging.info)
 
     @property
     def delta_icon(self) -> str:
@@ -296,6 +295,24 @@ class RCAllData(BaseModel):
         self.timestamp = datetime.now(timezone.utc)
         self.rcs = await get_rc_of_accounts(self.accounts, old_all_rcs=old_all_rcs)
         pass
+
+    def log_output(self, logger: Callable):
+        """
+        Log the output of all the data to the passed logger
+        """
+        if self.rcs:
+            self.rcs[0].log_line_header(logger)
+            [
+                rc.log_line_output(logger)
+                for rc in self.rcs
+                if rc.delegating == RCAccType.DELEGATING
+            ]
+            logger("-------- Targets -----------")
+            [
+                rc.log_line_output(logger)
+                for rc in self.rcs
+                if rc.delegating == RCAccType.TARGET
+            ]
 
     def _get_rcs(self, account: str) -> RCAccount:
         return [rc for rc in self.rcs if rc.account == account][0]

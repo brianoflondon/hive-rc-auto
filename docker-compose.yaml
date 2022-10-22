@@ -10,4 +10,4 @@ services:
     env_file:
       - ".env"
     command: bash -c "python bot.py"
-    # restart: unless-stopped
+    restart: unless-stopped

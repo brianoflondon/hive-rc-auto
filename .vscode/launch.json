@@ -13,6 +13,14 @@
             "justMyCode": true
         },
         {
+            "name": "RC Bot",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/bot.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Main Streamlit",
             "type": "python",
             "request": "launch",
