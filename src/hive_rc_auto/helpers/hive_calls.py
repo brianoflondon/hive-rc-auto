@@ -1,6 +1,8 @@
+import json
 import logging
 import os
 from random import shuffle
+import re
 from typing import Any, Callable, List, Optional, Union
 
 import backoff
@@ -11,8 +13,16 @@ from lighthive.datastructures import Operation
 from lighthive.exceptions import RPCNodeException
 from lighthive.helpers.account import VOTING_MANA_REGENERATION_IN_SECONDS
 from lighthive.node_picker import compare_nodes
+from pydantic import BaseModel
 
 Config.VOTING_MANA_REGENERATION_IN_SECONDS = VOTING_MANA_REGENERATION_IN_SECONDS
+
+
+class HiveTrx(BaseModel):
+    id: str
+    block_num: int
+    trx_num: int
+    expired: bool
 
 
 def get_client(
@@ -155,10 +165,93 @@ def make_lighthive_call(client: Client, call_to_make: Callable, params: Any = No
                 response = call_to_make()
             return response
         except Exception as ex:
-            logging.error(
-                f"{client.current_node} {client.api_type} Failing: {ex}"
-            )
+            logging.error(f"{client.current_node} {client.api_type} Failing: {ex}")
             client.next_node()
             logging.warning(f"Trying new node: {client.current_node}")
             counter -= 1
     raise Exception("Everything failed")
+
+
+async def construct_operation(
+    payload: dict,
+    hive_operation_id: str,
+    required_auth: str = None,
+    required_posting_auth: str = None,
+) -> Operation:
+    """Builed the operation for the blockchain"""
+    payload_json = json.dumps(payload, separators=(",", ":"), default=str)
+    if required_auth == None:
+        required_auths = []
+    else:
+        required_auths = [required_auth]
+    if required_posting_auth == None:
+        required_posting_auths = []
+    else:
+        required_posting_auths = [required_posting_auth]
+
+    op = Operation(
+        "custom_json",
+        {
+            "required_auths": required_auths,
+            "required_posting_auths": required_posting_auths,
+            "id": str(hive_operation_id),
+            "json": payload_json,
+        },
+    )
+    logging.info(op.op_value)
+    return op
+
+
+async def send_custom_json(
+    client: Client,
+    payload: dict,
+    hive_operation_id: str,
+    required_auth: str = None,
+    required_posting_auth: str = None,
+) -> Union[None, HiveTrx]:
+    """Build and send an operation to the blockchain"""
+    try:
+        trx = None
+        op = await construct_operation(
+            payload,
+            hive_operation_id,
+            required_auth=required_auth,
+            required_posting_auth=required_posting_auth,
+        )
+        trx = client.broadcast_sync(op=op, dry_run=False)
+
+        logging.info(f"Json sent via Lighthive Node: {client.current_node}")
+        logging.info(f"{trx}")
+        logging.info(f"https://hive.ausbit.dev/tx/{trx.get('id')}")
+        logging.info(f"https://hiveblocks.com/tx/{trx.get('id')}")
+        logging.info(payload)
+        if trx:
+            return HiveTrx.parse_obj(trx)
+
+    except RPCNodeException as ex:
+        logging.error(f"send_custom_json error: {ex}")
+        try:
+            if re.match(
+                r".*same amount of RC already exist.*",
+                ex.raw_body["error"]["message"],
+            ):
+                logging.info(ex.raw_body["error"]["message"])
+                logging.info("No changes to delegation")
+            elif re.match(
+                r"plugin exception.*custom json.*",
+                ex.raw_body["error"]["message"],
+            ):
+                logging.info(ex.raw_body["error"]["message"])
+                logging.info("Unhandled RPC error")
+                client.next_node()
+                raise ex
+            else:
+                raise ex
+        except (KeyError, AttributeError):
+            logging.error(f"{ex}")
+            logging.info("Non standard error message from RPC Node")
+            raise ex
+
+    except Exception as ex:
+        logging.error(f"{ex}")
+        raise ex
