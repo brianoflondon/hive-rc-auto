@@ -56,6 +56,7 @@ class RCDirectDelegation(BaseModel):
     acc_from: str = Field(None, alias="from")
     acc_to: str = Field(None, alias="to")
     delegated_rc: int = 0
+    cut: bool = None
 
     @property
     def payload_item(self):
@@ -67,6 +68,22 @@ class RCDirectDelegation(BaseModel):
                 "max_rc": self.delegated_rc,
             },
         ]
+
+    @property
+    def cut_string(self) -> str:
+        if self.cut is None:
+            return ""
+        if self.cut:
+            return "| Cutting    !"
+        else:
+            return "| Increasing ^"
+
+    def log_line_output(self, logger: Callable):
+        logger(
+            f"{self.acc_from:<16} -> {self.acc_to} | "
+            f"{mill(self.delegated_rc):>12,} M"
+            f"{self.cut_string}"
+        )
 
 
 class RCAccount(BaseModel):
@@ -250,40 +267,6 @@ class RCAccount(BaseModel):
         )
 
 
-class RCDirectDelegation(BaseModel):
-    acc_from: str = Field(None, alias="from")
-    acc_to: str = Field(None, alias="to")
-    delegated_rc: int = 0
-    cut: bool = None
-
-    @property
-    def payload_item(self):
-        return [
-            "delegate_rc",
-            {
-                "from": self.acc_from,
-                "delegatees": [self.acc_to],
-                "max_rc": self.delegated_rc,
-            },
-        ]
-
-    @property
-    def cut_string(self) -> str:
-        if self.cut is None:
-            return ""
-        if self.cut:
-            return "| Cutting    !"
-        else:
-            return "| Increasing ^"
-
-    def log_line_output(self, logger: Callable):
-        logger(
-            f"{self.acc_from:<16} -> {self.acc_to} | "
-            f"{mill(self.delegated_rc):>12,} M"
-            f"{self.cut_string}"
-        )
-
-
 class RCListOfAccounts(BaseModel):
     all: List[str] = []
     delegating: List[str] = []
@@ -357,7 +340,7 @@ class RCAllData(BaseModel):
                             "from": delegate_from,
                             "to": deleg[0],
                             "delegated_rc": deleg[1],
-                            "cut": False
+                            "cut": False,
                         }
                     )
                     self.pending_delegations.append(new_dd)
@@ -374,7 +357,7 @@ class RCAllData(BaseModel):
                             "from": cut_delegate_from,
                             "to": deleg[0],
                             "delegated_rc": new_amount,
-                            "cut": True
+                            "cut": True,
                         }
                     )
                     self.pending_delegations.append(new_dd)
