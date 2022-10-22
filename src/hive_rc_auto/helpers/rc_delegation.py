@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from enum import Enum
 from tabnanny import check
-from typing import Any, Callable, List, Union
+from typing import Any, Callable, List, Tuple, Union
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
@@ -196,6 +196,23 @@ class RCAccount(BaseModel):
     async def fill_delegations(self):
         self.deleg_out = await list_rc_direct_delegations(self.account)
 
+    def calculate_new_delegation(self) -> int:
+        """
+        According to the rules, work out what the new total delegation this account
+        needs to return to range.
+        If delegation is going DOWN, returns the amount it must go down by as a negative.
+        """
+        if self.status == RCStatus.OK:
+            return 0
+        if self.status == RCStatus.LOW:
+            percent_gap = Config.RC_PCT_LOWER_TARGET - self.real_mana_percent
+            new_amount = self.max_rc * (1 + ((percent_gap) / 100))
+            return new_amount
+        if self.status == RCStatus.HIGH:
+            percent_gap = self.real_mana_percent - Config.RC_PCT_UPPER_TARGET
+            delta = -self.max_rc * (((percent_gap) / 100))
+            return delta
+
     def log_output(self):
         logging.info(f"{self.account:<16} ---------------------------------------- ")
         logging.info(f"  % | {self.rc_percent:>5.2f} ")
@@ -237,6 +254,7 @@ class RCDirectDelegation(BaseModel):
     acc_from: str = Field(None, alias="from")
     acc_to: str = Field(None, alias="to")
     delegated_rc: int = 0
+    cut: bool = None
 
     @property
     def payload_item(self):
@@ -249,10 +267,20 @@ class RCDirectDelegation(BaseModel):
             },
         ]
 
+    @property
+    def cut_string(self) -> str:
+        if self.cut is None:
+            return ""
+        if self.cut:
+            return "| Cutting    !"
+        else:
+            return "| Increasing ^"
+
     def log_line_output(self, logger: Callable):
         logger(
             f"{self.acc_from:<16} -> {self.acc_to} | "
             f"{mill(self.delegated_rc):>12,} M"
+            f"{self.cut_string}"
         )
 
 
@@ -284,9 +312,16 @@ class RCAllData(BaseModel):
         [], title="All RC Accounts", description="All the tracked accounts RC details"
     )
     accounts: RCListOfAccounts
+    pending_delegations: List[RCDirectDelegation] = Field(
+        [], title="List of pending delegations"
+    )
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         super().__init__(**data)
+
+    def pending_delegations_by(self, delegator: str) -> int:
+        """Return just the pending delegations for a specific delgator account"""
+        return int(sum([dd.delegated_rc for dd in self.pending_delegations]))
 
     async def fill_data(self, old_all_rcs: List[RCAccount] = None):
         """
@@ -295,6 +330,58 @@ class RCAllData(BaseModel):
         self.timestamp = datetime.now(timezone.utc)
         self.rcs = await get_rc_of_accounts(self.accounts, old_all_rcs=old_all_rcs)
         pass
+
+    async def update_delegations(self):
+        """
+        Implement rules to update the delegations of high or low accounts
+        """
+        new_delegations = []
+        if self.rcs:
+            for rc in self.rcs:
+                if (
+                    rc.account in self.accounts.receiving
+                    and not rc.status == RCStatus.OK
+                ):
+                    rc.log_line_output(logging.warning)
+                    new_amount = rc.calculate_new_delegation()
+                    new_delegations.append((rc.account, new_amount))
+                    logging.info(f"Delegate {mill_s(new_amount)} to {rc.account:>16}")
+
+            new_delegations.sort(key=lambda x: x[1], reverse=True)
+            for deleg in new_delegations:
+                if deleg[1] > 0:
+                    delegate_from = await self.which_account_to_delegate_from(
+                        deleg[0], amount=deleg[1]
+                    )
+                    new_dd = RCDirectDelegation.parse_obj(
+                        {
+                            "from": delegate_from,
+                            "to": deleg[0],
+                            "delegated_rc": deleg[1],
+                            "cut": False
+                        }
+                    )
+                    self.pending_delegations.append(new_dd)
+                    logging.info(f"Deleg from {delegate_from} {deleg[0]} {deleg[1]}")
+                else:
+                    (
+                        cut_delegate_from,
+                        new_amount,
+                    ) = await self.which_account_to_cut_delegation_from(
+                        deleg[0], amount=new_amount
+                    )
+                    new_dd = RCDirectDelegation.parse_obj(
+                        {
+                            "from": delegate_from,
+                            "to": deleg[0],
+                            "delegated_rc": new_amount,
+                            "cut": True
+                        }
+                    )
+                    self.pending_delegations.append(new_dd)
+                    logging.info(
+                        f"Cut Deleg from {cut_delegate_from} {deleg[0]} {deleg[1]}"
+                    )
 
     def log_output(self, logger: Callable):
         """
@@ -307,12 +394,15 @@ class RCAllData(BaseModel):
                 for rc in self.rcs
                 if rc.delegating == RCAccType.DELEGATING
             ]
-            logger("-------- Targets -----------")
+            logger("-------- Targets             -----------")
             [
                 rc.log_line_output(logger)
                 for rc in self.rcs
                 if rc.delegating == RCAccType.TARGET
             ]
+        if self.pending_delegations:
+            logger("-------- Pending delegations  -----------")
+            [dd.log_line_output(logger) for dd in self.pending_delegations]
 
     def _get_rcs(self, account: str) -> RCAccount:
         return [rc for rc in self.rcs if rc.account == account][0]
@@ -338,9 +428,11 @@ class RCAllData(BaseModel):
         for delegator in self.accounts.delegating:
             dd_from = [dd for dd in dd_list if dd.acc_from == delegator]
             if dd_from:
-                amount -= dd_from[0].delegated_rc
+                amount -= dd_from[0].delegated_rc - self.pending_delegations_by(
+                    delegator
+                )
             rc_real_mana = self._get_rcs(delegator).real_mana
-            logging.debug(
+            logging.info(
                 f"Checking: {delegator:<16} | "
                 f"{mill_s(rc_real_mana)} - {mill_s(amount)} "
                 f"= {mill_s(rc_real_mana-amount)}"
@@ -349,6 +441,26 @@ class RCAllData(BaseModel):
                 return delegator
 
         return "Not enough RCs"
+
+    async def which_account_to_cut_delegation_from(
+        self, target: str, amount: int
+    ) -> Tuple[str, int]:
+        """Which delegating account can we reduce delegation from to drop delegation
+        by the target amount"""
+        rc = self._get_rcs(target)
+        dd_list = self._get_inbound_delegations(target)
+        logging.info(f"Account: {target:>16} remove {mill_s(amount)}")
+        [dd.log_line_output(logging.debug) for dd in dd_list]
+        for delegator in reversed(self.accounts.delegating):
+            dd_from = [dd for dd in dd_list if dd.acc_from == delegator]
+            if dd_from:
+                new_delegation = max(dd_from[0].delegated_rc + amount, 0)
+                logging.info(
+                    f"Checking: {delegator:<16} | "
+                    f"{mill_s(dd_from[0].delegated_rc)} {mill_s(amount)} "
+                    f"= {mill_s(new_delegation)}"
+                )
+                return delegator, new_delegation
 
 
 async def get_rc_of_accounts(
@@ -372,7 +484,7 @@ async def get_rc_of_accounts(
                 # Now fill in delegations FROM all delegating accounts
                 dd_list = await list_rc_direct_delegations(a["account"])
                 a["deleg_out"] = dd_list
-                [dd.log_line_output(logging.info) for dd in dd_list]
+                [dd.log_line_output(logging.debug) for dd in dd_list]
                 a["delegating"] = RCAccType.DELEGATING
             else:
                 a["delegating"] = RCAccType.TARGET

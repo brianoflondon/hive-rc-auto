@@ -17,6 +17,7 @@ async def update_rc_accounts():
     while True:
         all_data = RCAllData(accounts=all_accounts)
         await all_data.fill_data(old_all_rcs=old_all_rcs)
+        await all_data.update_delegations()
         all_data.log_output(logger=logging.info)
         old_all_rcs = all_data.rcs
         await asyncio.sleep(Config.UPDATE_FREQUENCY_SECS)
