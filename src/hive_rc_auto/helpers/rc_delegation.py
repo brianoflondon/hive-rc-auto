@@ -342,10 +342,9 @@ class RCAllData(BaseModel):
                     rc.account in self.accounts.receiving
                     and not rc.status == RCStatus.OK
                 ):
-                    rc.log_line_output(logging.warning)
                     new_amount = rc.calculate_new_delegation()
                     new_delegations.append((rc.account, new_amount))
-                    logging.info(f"Delegate {mill_s(new_amount)} to {rc.account:>16}")
+                    logging.debug(f"Delegate {mill_s(new_amount)} to {rc.account:>16}")
 
             new_delegations.sort(key=lambda x: x[1], reverse=True)
             for deleg in new_delegations:
@@ -362,7 +361,7 @@ class RCAllData(BaseModel):
                         }
                     )
                     self.pending_delegations.append(new_dd)
-                    logging.info(f"Deleg from {delegate_from} {deleg[0]} {deleg[1]}")
+                    logging.debug(f"Deleg from {delegate_from} {deleg[0]} {deleg[1]}")
                 else:
                     (
                         cut_delegate_from,
@@ -372,14 +371,14 @@ class RCAllData(BaseModel):
                     )
                     new_dd = RCDirectDelegation.parse_obj(
                         {
-                            "from": delegate_from,
+                            "from": cut_delegate_from,
                             "to": deleg[0],
                             "delegated_rc": new_amount,
                             "cut": True
                         }
                     )
                     self.pending_delegations.append(new_dd)
-                    logging.info(
+                    logging.debug(
                         f"Cut Deleg from {cut_delegate_from} {deleg[0]} {deleg[1]}"
                     )
 
@@ -432,7 +431,7 @@ class RCAllData(BaseModel):
                     delegator
                 )
             rc_real_mana = self._get_rcs(delegator).real_mana
-            logging.info(
+            logging.debug(
                 f"Checking: {delegator:<16} | "
                 f"{mill_s(rc_real_mana)} - {mill_s(amount)} "
                 f"= {mill_s(rc_real_mana-amount)}"
@@ -449,13 +448,13 @@ class RCAllData(BaseModel):
         by the target amount"""
         rc = self._get_rcs(target)
         dd_list = self._get_inbound_delegations(target)
-        logging.info(f"Account: {target:>16} remove {mill_s(amount)}")
+        logging.debug(f"Account: {target:>16} remove {mill_s(amount)}")
         [dd.log_line_output(logging.debug) for dd in dd_list]
         for delegator in reversed(self.accounts.delegating):
             dd_from = [dd for dd in dd_list if dd.acc_from == delegator]
             if dd_from:
                 new_delegation = max(dd_from[0].delegated_rc + amount, 0)
-                logging.info(
+                logging.debug(
                     f"Checking: {delegator:<16} | "
                     f"{mill_s(dd_from[0].delegated_rc)} {mill_s(amount)} "
                     f"= {mill_s(new_delegation)}"

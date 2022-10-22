@@ -26,13 +26,13 @@ def get_client(
     api_type="condenser_api",
 ) -> Client:
     try:
-        if os.getenv("PODPING_TESTNET", "False").lower() in (
+        if os.getenv("TESTNET", "False").lower() in (
             "true",
             "1",
             "t",
         ):
-            nodes = [os.getenv("PODPING_TESTNET_NODE")]
-            chain = {"chain_id": os.getenv("PODPING_TESTNET_CHAINID")}
+            nodes = [os.getenv("TESTNET_NODE")]
+            chain = {"chain_id": os.getenv("TESTNET_CHAINID")}
         else:
             nodes = [
                 "https://hived.emre.sh",
