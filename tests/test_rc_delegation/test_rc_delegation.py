@@ -20,8 +20,9 @@ def test_mill():
 @pytest.mark.asyncio
 async def test_list_rc_direct_delegations():
     deleg_list = await list_rc_direct_delegations("podping")
-    deleg_list2 = await list_rc_direct_delegations("podping", deleg_list[1].acc_to, 1)
-    assert deleg_list[1] == deleg_list2[0]
+    if deleg_list:
+        deleg_list2 = await list_rc_direct_delegations("podping", deleg_list[0].acc_to, 1)
+        assert deleg_list[0] == deleg_list2[0]
 
 
 @pytest.mark.slow

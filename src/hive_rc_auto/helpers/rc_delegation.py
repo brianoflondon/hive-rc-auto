@@ -12,6 +12,7 @@ from hive_rc_auto.helpers.hive_calls import (
     get_rcs,
     get_tracking_accounts,
     make_lighthive_call,
+    send_custom_json,
 )
 from pydantic import BaseModel, Field
 
@@ -59,7 +60,7 @@ class RCDirectDelegation(BaseModel):
     cut: bool = None
 
     @property
-    def payload_item(self):
+    def payload_item(self) -> List[dict]:
         return [
             "delegate_rc",
             {
@@ -350,7 +351,7 @@ class RCAllData(BaseModel):
                         cut_delegate_from,
                         new_amount,
                     ) = await self.which_account_to_cut_delegation_from(
-                        deleg[0], amount=new_amount
+                        deleg[0], amount=deleg[1]
                     )
                     new_dd = RCDirectDelegation.parse_obj(
                         {
@@ -364,6 +365,38 @@ class RCAllData(BaseModel):
                     logging.debug(
                         f"Cut Deleg from {cut_delegate_from} {deleg[0]} {deleg[1]}"
                     )
+
+    async def get_payload_for_pending_delegations(
+        self, send_json: bool = False
+    ) -> List:
+        """
+        Sorts through the pending delegations and returns separate payloads
+        one for each delegator. If send_json is True, send the jsons
+        """
+        payloads = []
+        hive_operation_id = "rc"
+        client = get_client(posting_keys=[Config.POSTING_KEY])
+        different_delegators = {dd.acc_from for dd in self.pending_delegations}
+        for delegator in different_delegators:
+            payload = []
+            for dd in [
+                dd for dd in self.pending_delegations if dd.acc_from == delegator
+            ]:
+                # Each item in payload must be a list with one item in it
+                payload += [dd.payload_item]
+            payloads.append(payload)
+            if send_json:
+                try:
+                    trx = await send_custom_json(
+                        client=client,
+                        payload=payload,
+                        hive_operation_id=hive_operation_id,
+                        required_posting_auth=dd.acc_from,
+                    )
+                    logging.info(f"Custom Json: {trx.trx_num}")
+                except Exception as ex:
+                    logging.error(ex)
+        return payloads
 
     def log_output(self, logger: Callable):
         """
@@ -431,13 +464,13 @@ class RCAllData(BaseModel):
         by the target amount"""
         rc = self._get_rcs(target)
         dd_list = self._get_inbound_delegations(target)
-        logging.debug(f"Account: {target:>16} remove {mill_s(amount)}")
+        logging.info(f"Account: {target:>16} remove {mill_s(amount)}")
         [dd.log_line_output(logging.debug) for dd in dd_list]
         for delegator in reversed(self.accounts.delegating):
             dd_from = [dd for dd in dd_list if dd.acc_from == delegator]
             if dd_from:
                 new_delegation = max(dd_from[0].delegated_rc + amount, 0)
-                logging.debug(
+                logging.info(
                     f"Checking: {delegator:<16} | "
                     f"{mill_s(dd_from[0].delegated_rc)} {mill_s(amount)} "
                     f"= {mill_s(new_delegation)}"
@@ -472,21 +505,6 @@ async def get_rc_of_accounts(
                 a["delegating"] = RCAccType.TARGET
             ans.append(RCAccount.parse_obj(a))
     return ans
-
-
-# async def get_rc_of_one_account(
-#     check_account: str, old_rc: RCAccount = None
-# ) -> Union[RCAccount, None]:
-#     """
-#     Return the RCAccount status of one account
-#     """
-#     if old_rc:
-#         ans = await get_rc_of_accounts([check_account], [old_rc])
-#     else:
-#         ans = await get_rc_of_accounts([check_account])
-#     if ans:
-#         return ans[0]
-#     return None
 
 
 async def list_rc_direct_delegations(

@@ -19,6 +19,7 @@ async def update_rc_accounts():
         await all_data.fill_data(old_all_rcs=old_all_rcs)
         await all_data.update_delegations()
         all_data.log_output(logger=logging.info)
+        await all_data.get_payload_for_pending_delegations(send_json=True)
         old_all_rcs = all_data.rcs
         await asyncio.sleep(Config.UPDATE_FREQUENCY_SECS)
 
@@ -41,7 +42,7 @@ if __name__ == "__main__":
     logging.info(f"Testnet: {os.getenv('TESTNET')}")
     logging.info(f"-------{__file__}----------------------")
 
-    asyncio.run(main_loop())
+    # asyncio.run(main_loop())
 
     try:
         asyncio.run(main_loop())
