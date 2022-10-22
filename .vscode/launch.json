@@ -5,13 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Main Streamlit",
             "type": "python",
             "request": "launch",
             "module": "streamlit",
             "cwd": "${workspaceFolder}/src/",
             "args": [
-                "run","hive_rc_auto/main.py"
+                "run",
+                "hive_rc_auto/main.py"
             ],
             "justMyCode": true
         }

@@ -38,7 +38,7 @@ def get_client(
                 "https://hived.emre.sh",
                 "https://api.hive.blog",
                 "https://api.deathwing.me",
-                "https://hive-api.arcange.eu",
+                # "https://hive-api.arcange.eu",
                 "https://api.openhive.network",
                 " https://rpc.ausbit.dev",
             ]
