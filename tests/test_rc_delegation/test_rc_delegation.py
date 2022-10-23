@@ -21,7 +21,9 @@ def test_mill():
 async def test_list_rc_direct_delegations():
     deleg_list = await list_rc_direct_delegations("podping")
     if deleg_list:
-        deleg_list2 = await list_rc_direct_delegations("podping", deleg_list[0].acc_to, 1)
+        deleg_list2 = await list_rc_direct_delegations(
+            "podping", deleg_list[0].acc_to, 1
+        )
         assert deleg_list[0] == deleg_list2[0]
 
 
@@ -39,6 +41,8 @@ async def test_get_rc_list_of_accounts_and_fill_data():
     # Fill update the data
     await all_data.fill_data(old_all_rcs=all_data.rcs)
     assert all_data
+
+    # await all_data.store_all_data()
 
     # Check for which account should delegate.
     amount_range = [1e9, 1e10, 1e11, 1.5e12, 3e12, 4e12, 5e12, 7e12, 1e13, 1e14, 1e15]

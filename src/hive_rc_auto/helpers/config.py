@@ -37,6 +37,12 @@ class Config:
         )
         TESTNET_NODE: List[str] = [os.getenv("TESTNET_NODE")]
         TESTNET_CHAINID: str = {"chain_id": os.getenv("TESTNET_CHAINID")}
+
+        DB_CONNECTION = os.getenv("DB_CONNECTION")
+        if not DB_CONNECTION:
+            DB_CONNECTION = "mongodb://127.0.0.1:27017"
+
+
     except AttributeError as ex:
         logging.exception(ex)
         logging.error("ENV File not found or not correct")

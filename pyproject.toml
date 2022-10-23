@@ -19,6 +19,7 @@ plotly = "^5.10.0"
 single-source = "^0.3.0"
 pymssql = "^2.2.5"
 hived-rpc-scanner = "^0.1.1"
+motor = "^3.0.0"
 
 
 [tool.poetry.group.dev.dependencies]

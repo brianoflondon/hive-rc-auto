@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from tabnanny import check
@@ -7,25 +9,27 @@ from typing import Any, Callable, List, Tuple, Union
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
-    get_client,
-    get_delegated_posting_auth_accounts,
-    get_rcs,
-    get_tracking_accounts,
-    make_lighthive_call,
-    send_custom_json,
-)
+    get_client, get_delegated_posting_auth_accounts, get_rcs,
+    get_tracking_accounts, make_lighthive_call, send_custom_json)
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pydantic import BaseModel, Field
 
 
-class RCStatus(Enum):
-    OK = 0
-    LOW = 1
-    HIGH = 2
+
+def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
+    """Returns the MongoDB"""
+    return AsyncIOMotorClient(Config.DB_CONNECTION)["podping"][collection]
 
 
-class RCAccType(Enum):
-    DELEGATING = 0
-    TARGET = 1
+class RCStatus(str, Enum):
+    OK = "ok"
+    LOW = "low"
+    HIGH = "high"
+
+
+class RCAccType(str, Enum):
+    DELEGATING = "delegating"
+    TARGET = "target"
 
 
 def mill(input: float) -> int:
@@ -86,10 +90,13 @@ class RCDirectDelegation(BaseModel):
             f"{self.cut_string}"
         )
 
+def get_utc_now_timestamp() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 class RCAccount(BaseModel):
     timestamp: datetime = Field(
-        default=datetime.now(timezone.utc),
+        default_factory=get_utc_now_timestamp,
         title="Timestamp",
         description="Timestamp of RC reading.",
     )
@@ -191,6 +198,9 @@ class RCAccount(BaseModel):
             Config.RC_BASE_LEVEL + __pydantic_self__.received_delegated_rc
         )
 
+    class Config:
+        use_enum_values = True  # <--
+
     @property
     def delta_icon(self) -> str:
         """"""
@@ -220,16 +230,38 @@ class RCAccount(BaseModel):
         needs to return to range.
         If delegation is going DOWN, returns the amount it must go down by as a negative.
         """
-        if self.status == RCStatus.OK:
-            return 0
         if self.status == RCStatus.LOW:
             percent_gap = Config.RC_PCT_LOWER_TARGET - self.real_mana_percent
             new_amount = self.max_rc * (1 + ((percent_gap) / 100))
             return new_amount
-        if self.status == RCStatus.HIGH:
+        if self.status == RCStatus.HIGH and self.delta_percent > 0:
             percent_gap = self.real_mana_percent - Config.RC_PCT_UPPER_TARGET
-            delta = -self.max_rc * (((percent_gap) / 100))
+            delta = - (self.max_rc * (((percent_gap) / 100))) * 1.3
             return delta
+        return 0
+
+    @property
+    def db_format(self) -> dict:
+        """Return fields to stor in the database"""
+        data = self.dict(
+            include={
+                "timestamp": True,
+                "account": True,
+                "delegating": True,
+                "status": True,
+                "max_rc": True,
+                "delegated_rc": True,
+                "received_delegated_rc": True,
+                "real_mana": True,
+                "real_mana_percent": True,
+                "delta_percent": True,
+                "rc_deleg_available": True,
+            }
+        )
+        data["delta_icon"] = self.delta_icon
+        if Config.TESTNET:
+            data["testnet"] = True
+        return data
 
     def log_output(self):
         logging.info(f"{self.account:<16} ---------------------------------------- ")
@@ -245,7 +277,7 @@ class RCAccount(BaseModel):
         logger(
             f"{self.account:<16} | {self.delta_icon} | "
             f"{self.real_mana_percent:>6.1f} %| "
-            f"{self.delta_percent:>7.3f} %| "
+            f"{self.delta_percent:>8.2f} %| "
             f"{mill(self.real_mana):>12,} M |"
             # f"{mill(self.max_rc):>12,} M | "
             f"{mill(self.delegated_rc):>12,} M |"
@@ -256,10 +288,11 @@ class RCAccount(BaseModel):
 
     @classmethod
     def log_line_header(cls, logger: Callable):
+        logger("-"*50)
         logger(
             f"{cls.__fields__['account'].field_info.title:<16} |    | "
             f"{cls.__fields__['real_mana_percent'].field_info.title:>6} %| "
-            f"{cls.__fields__['delta_percent'].field_info.title:>7} %| "
+            f"{cls.__fields__['delta_percent'].field_info.title:>8} %| "
             f"{cls.__fields__['real_mana'].field_info.title:>12} M |"
             # f"{cls.__fields__['max_rc'].field_info.title:>12} M | "
             f"{cls.__fields__['delegated_rc'].field_info.title:>12} M |"
@@ -476,6 +509,13 @@ class RCAllData(BaseModel):
                     f"= {mill_s(new_delegation)}"
                 )
                 return delegator, new_delegation
+
+    async def store_all_data(self):
+        """Store all this item's relevant data in a MongoDB"""
+        db_name = "rc_history_testnet" if Config.TESTNET else "rc_history"
+        db_rc_history = get_mongo_db(db_name)
+        data = [rc.db_format for rc in self.rcs]
+        ans = await db_rc_history.insert_many(data)
 
 
 async def get_rc_of_accounts(

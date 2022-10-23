@@ -2,12 +2,18 @@ version: '3'
 
 services:
 
-  v4vapi:
+  rc_bot:
     container_name: rc_bot
     build:
       context: .
       dockerfile: Dockerfile
     env_file:
       - ".env"
+    environment:
+      DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "python bot.py"
     restart: unless-stopped
+
+networks:
+  default:
+    name: v4vapi_default

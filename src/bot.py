@@ -4,6 +4,9 @@ import os
 from datetime import datetime
 from typing import List
 
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
+from pymongo.errors import DuplicateKeyError, ServerSelectionTimeoutError
+
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.rc_delegation import RCAccount, RCAllData, RCListOfAccounts
 
@@ -20,12 +23,27 @@ async def update_rc_accounts():
         await all_data.update_delegations()
         all_data.log_output(logger=logging.info)
         await all_data.get_payload_for_pending_delegations(send_json=True)
+        asyncio.create_task(all_data.store_all_data())
         old_all_rcs = all_data.rcs
         await asyncio.sleep(Config.UPDATE_FREQUENCY_SECS)
 
 
+async def check_db():
+    logging.info(Config.DB_CONNECTION)
+    try:
+        server_info = await AsyncIOMotorClient(
+            Config.DB_CONNECTION, serverSelectionTimeoutMS=5000
+        ).server_info()
+    except ServerSelectionTimeoutError as ex:
+        logging.error("Bad database connection: %s", Config.DB_CONNECTION)
+        raise ex
+    except Exception as ex:
+        logging.exception(ex)
+
+
 async def main_loop():
     # Setup the data
+    await check_db()
     tasks = [update_rc_accounts()]
     await asyncio.gather(*tasks)
 
@@ -52,4 +70,5 @@ if __name__ == "__main__":
         logging.info("Asyncio cancelled")
 
     except Exception as ex:
-        logging.error(ex.__class__)
+        logging.exception(ex)
+        logging.error(ex)
