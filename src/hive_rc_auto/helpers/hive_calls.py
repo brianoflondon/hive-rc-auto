@@ -13,13 +13,13 @@ from lighthive.datastructures import Operation
 from lighthive.exceptions import RPCNodeException
 from lighthive.helpers.account import VOTING_MANA_REGENERATION_IN_SECONDS
 from lighthive.node_picker import compare_nodes
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 Config.VOTING_MANA_REGENERATION_IN_SECONDS = VOTING_MANA_REGENERATION_IN_SECONDS
 
 
 class HiveTrx(BaseModel):
-    id: str
+    trx_id: str = Field(alias = "id")
     block_num: int
     trx_num: int
     expired: bool

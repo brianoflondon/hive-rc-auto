@@ -9,8 +9,14 @@ from typing import Any, Callable, List, Tuple, Union
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
-    get_client, get_delegated_posting_auth_accounts, get_rcs,
-    get_tracking_accounts, make_lighthive_call, send_custom_json)
+    HiveTrx,
+    get_client,
+    get_delegated_posting_auth_accounts,
+    get_rcs,
+    get_tracking_accounts,
+    make_lighthive_call,
+    send_custom_json,
+)
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pydantic import BaseModel, Field
 
@@ -24,6 +30,10 @@ class RCStatus(str, Enum):
     OK = "ok"
     LOW = "low"
     HIGH = "high"
+
+
+def get_utc_now_timestamp() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class RCAccType(str, Enum):
@@ -62,6 +72,12 @@ class RCDirectDelegation(BaseModel):
     delegated_rc: int = 0
     cut: bool = None
 
+    def db_format(self, trx: HiveTrx) -> dict:
+        ans = self.dict() | trx.dict()
+        ans["account"] = ans["acc_to"]
+        ans["timestamp"] = get_utc_now_timestamp()
+        return ans
+
     @property
     def payload_item(self) -> List[dict]:
         return [
@@ -88,9 +104,6 @@ class RCDirectDelegation(BaseModel):
             f"{mill(self.delegated_rc):>12,} M"
             f"{self.cut_string}"
         )
-
-def get_utc_now_timestamp() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class RCAccount(BaseModel):
@@ -235,7 +248,7 @@ class RCAccount(BaseModel):
             return new_amount
         if self.status == RCStatus.HIGH and self.delta_percent > 0:
             percent_gap = self.real_mana_percent - Config.RC_PCT_UPPER_TARGET
-            delta = - (self.max_rc * (((percent_gap) / 100))) * 1.3
+            delta = -(self.max_rc * (((percent_gap) / 100))) * 1.3
             return delta
         return 0
 
@@ -287,7 +300,7 @@ class RCAccount(BaseModel):
 
     @classmethod
     def log_line_header(cls, logger: Callable):
-        logger("-"*50)
+        logger("-" * 50)
         logger(
             f"{cls.__fields__['account'].field_info.title:<16} |    | "
             f"{cls.__fields__['real_mana_percent'].field_info.title:>6} %| "
@@ -312,9 +325,9 @@ class RCListOfAccounts(BaseModel):
             primary_account
         )
         __pydantic_self__.receiving = get_tracking_accounts(primary_account)
-        __pydantic_self__.all = list(set(
-            __pydantic_self__.delegating + __pydantic_self__.receiving
-        ))
+        __pydantic_self__.all = list(
+            set(__pydantic_self__.delegating + __pydantic_self__.receiving)
+        )
 
 
 class RCAllData(BaseModel):
@@ -378,7 +391,7 @@ class RCAllData(BaseModel):
                     )
                     self.pending_delegations.append(new_dd)
                     logging.debug(f"Deleg from {delegate_from} {deleg[0]} {deleg[1]}")
-                else:
+                elif deleg[1] < 0:
                     (
                         cut_delegate_from,
                         new_amount,
@@ -425,7 +438,15 @@ class RCAllData(BaseModel):
                         hive_operation_id=hive_operation_id,
                         required_posting_auth=dd.acc_from,
                     )
-                    logging.info(f"Custom Json: {trx.trx_num}")
+                    if trx:
+                        logging.info(f"Custom Json: {trx.trx_num}")
+                        db_name = (
+                            "rc_history_testnet" if Config.TESTNET else "rc_history"
+                        )
+                        db_delegations = get_mongo_db(db_name)
+                        await db_delegations.insert_many(
+                            [pd.db_format(trx=trx) for pd in self.pending_delegations]
+                        )
                 except Exception as ex:
                     logging.error(ex)
         return payloads
