@@ -1,92 +1,148 @@
-import time  # to simulate a real time data, time loop
+import asyncio
+import logging
+import os
+from datetime import datetime
+from itertools import cycle
+from tabnanny import check
+from typing import List, Tuple
 
-import numpy as np  # np mean, np random
-import pandas as pd  # read csv, df manipulation
-import plotly.express as px  # interactive charts
-import streamlit as st  # 🎈 data web app development
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
-st.set_page_config(
-    page_title="Real-Time Data Science Dashboard",
-    page_icon="✅",
-    layout="wide",
+from hive_rc_auto.helpers.config import Config
+from hive_rc_auto.helpers.hive_calls import get_tracking_accounts
+from hive_rc_auto.helpers.rc_delegation import (
+    RCAccount,
+    RCAccType,
+    RCManabar,
+    get_rc_of_accounts,
 )
 
-# read csv from a github repo
-dataset_url = "https://raw.githubusercontent.com/Lexie88rus/bank-marketing-analysis/master/bank.csv"
 
-# read csv from a URL
 @st.experimental_memo
-def get_data() -> pd.DataFrame:
-    return pd.read_csv(dataset_url)
+def tracking_accounts() -> List[str]:
+    ta = get_tracking_accounts()
+    return ta
 
-df = get_data()
 
-# dashboard title
-st.title("Real-Time / Live Data Science Dashboard")
+async def fill_rc_list(old_all_rcs: List[RCAccount]) -> List[RCAccount]:
+    """
+    Returns two lists of RC objects one for the delegating and one for
+    the target accounts
+    """
+    ta = tracking_accounts()
 
-# top-level filters
-job_filter = st.selectbox("Select the Job", pd.unique(df["job"]))
-
-# creating a single-element container
-placeholder = st.empty()
-
-# dataframe filter
-df = df[df["job"] == job_filter]
-
-# near real-time / live feed simulation
-for seconds in range(200):
-
-    df["age_new"] = df["age"] * np.random.choice(range(1, 5))
-    df["balance_new"] = df["balance"] * np.random.choice(range(1, 5))
-
-    # creating KPIs
-    avg_age = np.mean(df["age_new"])
-
-    count_married = int(
-        df[(df["marital"] == "married")]["marital"].count()
-        + np.random.choice(range(1, 30))
+    all_rcs = await get_rc_of_accounts(
+        check_accounts=Config.DELEGATING_ACCOUNTS + ta, old_all_rcs=old_all_rcs
     )
+    return all_rcs
 
-    balance = np.mean(df["balance_new"])
 
-    with placeholder.container():
-
-        # create three columns
-        kpi1, kpi2, kpi3 = st.columns(3)
-
-        # fill in those three columns with respective metrics or KPIs
-        kpi1.metric(
-            label="Age ⏳",
-            value=round(avg_age),
-            delta=round(avg_age) - 10,
+def rc_guage(rc: RCAccount):
+    logging.info(f"reference: {rc.real_mana_percent + rc.delta_percent}")
+    logging.info(f"real_mana_percent: {rc.real_mana_percent}")
+    logging.info(f"delta_percent: {rc.delta_percent}")
+    fig = go.Figure(
+        go.Indicator(
+            domain={"x": [0, 1], "y": [0, 1]},
+            value=rc.real_mana_percent,
+            mode="gauge+number+delta",
+            title={"text": rc.account},
+            delta={"reference": (rc.real_mana_percent + rc.delta_percent)},
+            gauge={
+                "bar": {"color": "black"},
+                "axis": {"range": [0, 100]},
+                "steps": [
+                    {"range": [0, 10], "color": "red"},
+                    {"range": [10, 37], "color": "mediumvioletred"},
+                    {"range": [37, 75], "color": "blue"},
+                ],
+                "threshold": {
+                    "line": {"color": "red", "width": 4},
+                    "thickness": 0.75,
+                    "value": 10,
+                },
+            },
         )
+    )
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=0, b=0),
+    )
+    return fig
 
-        kpi2.metric(
-            label="Married Count 💍",
-            value=int(count_married),
-            delta=-10 + count_married,
-        )
 
-        kpi3.metric(
-            label="A/C Balance ＄",
-            value=f"$ {round(balance,2)} ",
-            delta=-round(balance / count_married) * 100,
-        )
+async def grid(ncol: int = 3, old_all_rcs: List[RCAccount] = None):
+    """
+    Output a grid <ncol> columns
+    """
+    all_rcs = await fill_rc_list(old_all_rcs)
+    # all_dt = pd.DataFrame([s.__dict__ for s in all_rcs])
+    # all_dt = all_dt.set_index("timestamp")
+    # st.dataframe(data=all_dt, use_container_width=True)
+    st.text("Delegating Accounts")
+    cols = st.columns(ncol)
+    for i, rc in zip(
+        cycle(range(ncol)),
+        filter(lambda x: x.delegating == RCAccType.DELEGATING, all_rcs),
+    ):
+        col = cols[i % ncol]
+        # col.metric(
+        #     label=rc.account, value=f"{rc.real_mana_percent:.1f} %", delta="1.2 %"
+        # )
+        col.plotly_chart(rc_guage(rc), use_container_width=True)
 
-        # create two columns for charts
-        fig_col1, fig_col2 = st.columns(2)
-        with fig_col1:
-            st.markdown("### First Chart")
-            fig = px.density_heatmap(
-                data_frame=df, y="age_new", x="marital"
-            )
-            st.write(fig)
+    st.text("Target Accounts")
+    cols2 = st.columns(ncol)
+    for i, rc in zip(
+        cycle(range(ncol)),
+        filter(
+            lambda x: x.delegating == RCAccType.TARGET and x.real_mana_percent < 100,
+            all_rcs,
+        ),
+    ):
+        col = cols2[i % ncol]
+        col.plotly_chart(rc_guage(rc), use_container_width=True)
+        # col.metric(
+        #     label=rc.account, value=f"{rc.real_mana_percent:.1f} %", delta="1.2 %"
+        # )
+    return all_rcs
 
-        with fig_col2:
-            st.markdown("### Second Chart")
-            fig2 = px.histogram(data_frame=df, x="age_new")
-            st.write(fig2)
 
-        st.markdown("### Detailed Data View")
-        st.dataframe(df)
-        time.sleep(1)
+async def main_loop(old_all_rcs=None):
+
+    logging.info(f"Running at {datetime.now()}")
+    st.title("RC Delegations")
+    await asyncio.sleep(Config.UPDATE_FREQUENCY_SECS)
+    logging.info("Running again")
+
+
+
+if __name__ == "__main__":
+    # debug = False
+    # logging.basicConfig(
+    #     level=logging.INFO if not debug else logging.DEBUG,
+    #     format="%(asctime)s %(levelname)-8s %(module)-14s %(lineno) 5d : %(message)s",
+    #     datefmt="%m-%dT%H:%M:%S",
+    # )
+    logging.info("----------------------------------------")
+    logging.info(f"Running at {datetime.now()}")
+    logging.info(f"Testnet: {os.getenv('TESTNET')}")
+    logging.info("----------------------------------------")
+    st.set_page_config(
+        page_title="RC Delegation - Auto",
+        page_icon="🧊",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    # try:
+    asyncio.run(main_loop())
+    # except KeyboardInterrupt:
+    #     logging.info("Terminated with Ctrl-C")
+    # except asyncio.CancelledError:
+    #     logging.info("Asyncio cancelled")
+
+    # except Exception as ex:
+    #     logging.error(ex.__class__)

@@ -25,6 +25,8 @@ def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
     """Returns the MongoDB"""
     return AsyncIOMotorClient(Config.DB_CONNECTION)["podping"][collection]
 
+def get_utc_now_timestamp() -> datetime:
+    return datetime.now(timezone.utc)
 
 class RCStatus(str, Enum):
     OK = "ok"
@@ -32,8 +34,6 @@ class RCStatus(str, Enum):
     HIGH = "high"
 
 
-def get_utc_now_timestamp() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class RCAccType(str, Enum):
@@ -73,9 +73,10 @@ class RCDirectDelegation(BaseModel):
     cut: bool = None
 
     def db_format(self, trx: HiveTrx) -> dict:
-        ans = self.dict() | trx.dict()
-        ans["account"] = ans["acc_to"]
+        ans = {}
         ans["timestamp"] = get_utc_now_timestamp()
+        ans["account"] = self.acc_to
+        ans = ans | self.dict() | trx.dict()
         return ans
 
     @property
