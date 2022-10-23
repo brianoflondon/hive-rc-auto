@@ -15,7 +15,6 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pydantic import BaseModel, Field
 
 
-
 def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
     """Returns the MongoDB"""
     return AsyncIOMotorClient(Config.DB_CONNECTION)["podping"][collection]
@@ -313,9 +312,9 @@ class RCListOfAccounts(BaseModel):
             primary_account
         )
         __pydantic_self__.receiving = get_tracking_accounts(primary_account)
-        __pydantic_self__.all = (
+        __pydantic_self__.all = list(set(
             __pydantic_self__.delegating + __pydantic_self__.receiving
-        )
+        ))
 
 
 class RCAllData(BaseModel):
