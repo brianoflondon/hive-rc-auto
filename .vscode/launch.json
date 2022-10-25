@@ -28,7 +28,7 @@
             "cwd": "${workspaceFolder}/src/",
             "args": [
                 "run",
-                "hive_rc_auto/main.py"
+                "main.py"
             ],
             "justMyCode": true
         }
