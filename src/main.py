@@ -69,7 +69,7 @@ def build_rc_graph(
     dfa = df[df.account == hive_acc]
     # dfa.resample('10T').mean(numeric_only=True)
     logging.info(f"Resample {hive_acc} - {timer()-start:.2f}s")
-    df_rc_change = df_rc_changes[df_rc_changes.account == hive_acc]
+    # df_rc_change = df_rc_changes[df_rc_changes.account == hive_acc]
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     fig.add_trace(
         go.Scatter(x=dfa.age_hours, y=dfa["real_mana_percent"], name="RC %"),
@@ -136,9 +136,11 @@ async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
         data.append(doc)
 
     df_rc_changes = pd.DataFrame(data)
-    df_rc_changes["age"] = datetime.utcnow() - df_rc_changes.timestamp
-    df_rc_changes.set_index("timestamp", inplace=True)
-    df_rc_changes["age_hours"] = df_rc_changes["age"].dt.total_seconds() / 3600
+    if data:
+        df_rc_changes["age"] = datetime.utcnow() - df_rc_changes.timestamp
+        df_rc_changes.set_index("timestamp", inplace=True)
+        df_rc_changes["age_hours"] = df_rc_changes["age"].dt.total_seconds() / 3600
+
     return df, df_rc_changes
 
 
