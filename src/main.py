@@ -88,7 +88,13 @@ def build_rc_graph(
     # Set x-axis title
     fig.update_xaxes(title_text=f"Age (hours) - {hive_acc}")
 
-    fig.update_layout(title_text=f"<b>{hive_acc}</b> Resource Credits")
+    last_reading = dfa.real_mana_percent.iloc[-1]
+    fig.update_layout(title_text=(
+        f"<b>{hive_acc}</b> RC's<br>"
+        f"Last reading: <b>{last_reading:.1f}%</b><br>"
+        f"Time: {dfa.last_valid_index():%H:%M:%S}"
+        )
+                      )
     # Set y-axes titles
     fig.update_yaxes(title_text="<b>RC %</b>", secondary_y=False)
     fig.update_yaxes(title_text="<b>RC</b>", secondary_y=True)
@@ -100,7 +106,7 @@ def build_rc_graph(
         showlegend=True,
     )
     # Position Text
-    fig.update_layout(legend_x=0.80, legend_y=0.85)
+    fig.update_layout(legend_x=0.2, legend_y=0.85)
     fig.update_layout(title_x=0.2, title_y=0.2)
 
     fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
@@ -146,7 +152,6 @@ async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 def hours_selectbox():
     hours_selectbox_options = [4, 8, 24]
-    st.title("RC Levels")
     st.session_state.hours = st.selectbox(
         label="Hours",
         options=hours_selectbox_options,
@@ -197,6 +202,7 @@ async def main_loop():
         st.session_state.hours = 24
     hours_selectbox()
     await grid(ncol=3)
+    st.title("RC Levels")
     await rerun_after_data_update()
 
 
