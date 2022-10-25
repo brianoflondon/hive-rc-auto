@@ -9,8 +9,8 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ".env"
-    environment:
-      DB_CONNECTION: "mongodb://mongodb:27017"
+    # environment:
+    #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "python bot.py"
     restart: unless-stopped
 
@@ -23,8 +23,8 @@ services:
       - ".env"
     ports:
       - 8501:8501
-    environment:
-      DB_CONNECTION: "mongodb://mongodb:27017"
+    # environment:
+    #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "streamlit run main.py"
     restart: unless-stopped
 
