@@ -166,14 +166,28 @@ def hours_selectbox():
 async def grid(ncol: int = 2):
 
     df, df_rc_changes = await get_data()
-    all_accounts = df.account.unique()
+    df_delegating = df[df["delegating"] == "delegating"]
+    del_accounts = df_delegating.account.unique()
+    all_accounts = df[df.delegating == "target"].account.unique()
     all_accounts.sort()
     cols = st.columns(ncol)
     filtered_accounts = []
     for hive_acc in all_accounts:
         dfa = df[df.account == hive_acc]
-        if dfa.real_mana_percent.iloc[-1] < 95:
+        if dfa.real_mana_percent.iloc[-1] < 95 and (
+            not df.delegating.iloc[-1] == "delegating"
+        ):
             filtered_accounts.append(hive_acc)
+
+    for i, hive_acc in zip(
+        cycle(range(ncol)),
+        del_accounts,
+    ):
+        col = cols[i % ncol]
+        dfa = df[df.account == hive_acc]
+        col.plotly_chart(
+            build_rc_graph(df, df_rc_changes, hive_acc), use_container_width=True
+        )
 
     for i, hive_acc in zip(
         cycle(range(ncol)),
@@ -205,7 +219,7 @@ async def main_loop():
     hours_selectbox()
     await grid(ncol=3)
     st.title("RC Levels")
-    
+
     # await rerun_after_data_update()
 
 
