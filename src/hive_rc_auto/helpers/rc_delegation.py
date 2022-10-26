@@ -1,4 +1,3 @@
-
 import logging
 from datetime import datetime, timezone
 from enum import Enum
@@ -6,8 +5,14 @@ from typing import Any, Callable, List, Tuple
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
-    HiveTrx, get_client, get_delegated_posting_auth_accounts, get_rcs,
-    get_tracking_accounts, make_lighthive_call, send_custom_json)
+    HiveTrx,
+    get_client,
+    get_delegated_posting_auth_accounts,
+    get_rcs,
+    get_tracking_accounts,
+    make_lighthive_call,
+    send_custom_json,
+)
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pydantic import BaseModel, Field
 
@@ -16,15 +21,15 @@ def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
     """Returns the MongoDB"""
     return AsyncIOMotorClient(Config.DB_CONNECTION)["podping"][collection]
 
+
 def get_utc_now_timestamp() -> datetime:
     return datetime.now(timezone.utc)
+
 
 class RCStatus(str, Enum):
     OK = "ok"
     LOW = "low"
     HIGH = "high"
-
-
 
 
 class RCAccType(str, Enum):
@@ -240,7 +245,7 @@ class RCAccount(BaseModel):
             return new_amount
         if self.status == RCStatus.HIGH and self.delta_percent > 0:
             percent_gap = self.real_mana_percent - Config.RC_PCT_UPPER_TARGET
-            delta = -(self.max_rc * (((percent_gap) / 100))) * 1.3
+            delta = -(self.max_rc * (((percent_gap) / 100))) * 1.5
             return delta
         return 0
 
