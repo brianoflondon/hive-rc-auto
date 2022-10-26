@@ -244,8 +244,8 @@ class RCAccount(BaseModel):
             new_amount = self.max_rc * (1 + ((percent_gap) / 100))
             return new_amount
         if self.status == RCStatus.HIGH and self.delta_percent > 0:
-            percent_gap = self.real_mana_percent - Config.RC_PCT_UPPER_TARGET
-            delta = -(self.max_rc * (((percent_gap) / 100))) * 1.5
+            percent_gap = self.real_mana_percent - Config.RC_PCT_UPPER_TARGET - 2
+            delta = -(self.max_rc * (((percent_gap) / 100))) * 1.1
             return delta
         return 0
 
