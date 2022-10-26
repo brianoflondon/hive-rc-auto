@@ -154,7 +154,9 @@ async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 def hours_selectbox():
     hours_selectbox_options = [4, 8, 24]
-    st.session_state.hours = st.selectbox(
+    cols = st.columns(2)
+    cols[0].subheader("RC Levels")
+    st.session_state.hours = cols[1].selectbox(
         label="Hours",
         options=hours_selectbox_options,
         index=2,
@@ -170,8 +172,8 @@ async def grid(ncol: int = 2):
     del_accounts = df_delegating.account.unique()
     all_accounts = df[df.delegating == "target"].account.unique()
     all_accounts.sort()
-    cols = st.columns(ncol)
     filtered_accounts = []
+
     for hive_acc in all_accounts:
         dfa = df[df.account == hive_acc]
         if dfa.real_mana_percent.iloc[-1] < 95 and (
@@ -179,6 +181,8 @@ async def grid(ncol: int = 2):
         ):
             filtered_accounts.append(hive_acc)
 
+    st.subheader("Delegating Accounts")
+    cols = st.columns(ncol)
     for i, hive_acc in zip(
         cycle(range(ncol)),
         del_accounts,
@@ -188,12 +192,13 @@ async def grid(ncol: int = 2):
         col.plotly_chart(
             build_rc_graph(df, df_rc_changes, hive_acc), use_container_width=True
         )
-
+    st.subheader("Receiving Accounts")
+    cols2 = st.columns(ncol)
     for i, hive_acc in zip(
         cycle(range(ncol)),
         filtered_accounts,
     ):
-        col = cols[i % ncol]
+        col = cols2[i % ncol]
         dfa = df[df.account == hive_acc]
         col.plotly_chart(
             build_rc_graph(df, df_rc_changes, hive_acc), use_container_width=True
@@ -218,7 +223,6 @@ async def main_loop():
         st.session_state.hours = 24
     hours_selectbox()
     await grid(ncol=3)
-    st.title("RC Levels")
 
     # await rerun_after_data_update()
 
