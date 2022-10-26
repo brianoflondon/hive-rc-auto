@@ -1,4 +1,4 @@
-FROM python:3.9.4
+FROM python:3.10
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \

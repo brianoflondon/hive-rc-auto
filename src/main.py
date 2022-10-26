@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from dotenv import load_dotenv
 from plotly.subplots import make_subplots
 from streamlit_autorefresh import st_autorefresh
 
@@ -68,8 +67,8 @@ def build_rc_graph(
     logging.info(f"Building graph {hive_acc}")
     dfa = df[df.account == hive_acc]
     # dfa.resample('10T').mean(numeric_only=True)
-    logging.info(f"Resample {hive_acc} - {timer()-start:.2f}s")
-    # df_rc_change = df_rc_changes[df_rc_changes.account == hive_acc]
+    # logging.info(f"Resample {hive_acc} - {timer()-start:.2f}s")
+    df_rc_change = df_rc_changes[df_rc_changes.account == hive_acc]
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     fig.add_trace(
         go.Scatter(x=dfa.age_hours, y=dfa["real_mana_percent"], name="RC %"),
@@ -81,20 +80,23 @@ def build_rc_graph(
     )
 
     # Very expensive shows each change
-    # for index, row in df_rc_change.iterrows():
-    #     up_down = "down" if row.cut else "up"
-    #     fig.add_vline(x=row.age_hours, line_width=0.6, line_dash="dash", line_color="green")
+    for index, row in df_rc_change.iterrows():
+        up_down = "down" if row.cut else "up"
+        fig.add_vline(
+            x=row.age_hours, line_width=0.6, line_dash="dash", line_color="green"
+        )
 
     # Set x-axis title
     fig.update_xaxes(title_text=f"Age (hours) - {hive_acc}")
 
     last_reading = dfa.real_mana_percent.iloc[-1]
-    fig.update_layout(title_text=(
-        f"<b>{hive_acc}</b> RC's<br>"
-        f"Last reading: <b>{last_reading:.1f}%</b><br>"
-        f"Time: {dfa.last_valid_index():%H:%M:%S}"
+    fig.update_layout(
+        title_text=(
+            f"<b>{hive_acc}</b> RC's<br>"
+            f"Last reading: <b>{last_reading:.1f}%</b><br>"
+            f"Time: {dfa.last_valid_index():%H:%M:%S}"
         )
-                      )
+    )
     # Set y-axes titles
     fig.update_yaxes(title_text="<b>RC %</b>", secondary_y=False)
     fig.update_yaxes(title_text="<b>RC</b>", secondary_y=True)
@@ -112,7 +114,7 @@ def build_rc_graph(
     fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
     fig.update_xaxes(autorange="reversed")
     # fig.show()
-    logging.info(f"Time to build graph {hive_acc} - {timer()-start:.2f}s")
+    logging.info(f"Time to build graph {hive_acc} - {timer()-start:.4f}s")
     return fig
 
 
@@ -203,7 +205,8 @@ async def main_loop():
     hours_selectbox()
     await grid(ncol=3)
     st.title("RC Levels")
-    await rerun_after_data_update()
+    
+    # await rerun_after_data_update()
 
 
 if __name__ == "__main__":
