@@ -15,16 +15,11 @@ from streamlit_autorefresh import st_autorefresh
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import get_tracking_accounts
-from hive_rc_auto.helpers.rc_delegation import (
-    RCAccount,
-    RCAccType,
-    RCAllData,
-    RCListOfAccounts,
-    RCManabar,
-    get_mongo_db,
-    get_rc_of_accounts,
-    get_utc_now_timestamp,
-)
+from hive_rc_auto.helpers.rc_delegation import (RCAccount, RCAccType,
+                                                RCAllData, RCListOfAccounts,
+                                                RCManabar, get_mongo_db,
+                                                get_rc_of_accounts,
+                                                get_utc_now_timestamp)
 
 
 def rc_guage(rc: RCAccount):
@@ -68,7 +63,6 @@ def build_rc_graph(
     dfa = df[df.account == hive_acc]
     # dfa.resample('10T').mean(numeric_only=True)
     # logging.info(f"Resample {hive_acc} - {timer()-start:.2f}s")
-    df_rc_change = df_rc_changes[df_rc_changes.account == hive_acc]
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     fig.add_trace(
         go.Scatter(x=dfa.age_hours, y=dfa["real_mana_percent"], name="RC %"),
@@ -80,11 +74,14 @@ def build_rc_graph(
     )
 
     # Very expensive shows each change
-    for index, row in df_rc_change.iterrows():
-        up_down = "down" if row.cut else "up"
-        fig.add_vline(
-            x=row.age_hours, line_width=0.6, line_dash="dash", line_color="green"
-        )
+    if not df_rc_changes.empty:
+        df_rc_change = df_rc_changes[df_rc_changes.account == hive_acc]
+        if not df_rc_change.empty:
+            for index, row in df_rc_change.iterrows():
+                up_down = "down" if row.cut else "up"
+                fig.add_vline(
+                    x=row.age_hours, line_width=0.6, line_dash="dash", line_color="green"
+                )
 
     # Set x-axis title
     fig.update_xaxes(title_text=f"Age (hours) - {hive_acc}")
@@ -116,7 +113,6 @@ def build_rc_graph(
     # fig.show()
     logging.info(f"Time to build graph {hive_acc} - {timer()-start:.4f}s")
     return fig
-
 
 async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Fetch data from Mongodb
