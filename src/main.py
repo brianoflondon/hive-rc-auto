@@ -138,7 +138,7 @@ async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     df.set_index("timestamp", inplace=True)
     df["age_hours"] = df["age"].dt.total_seconds() / 3600
 
-    cursor = db_rc_history.find({"real_mana": None}, {"_id": 0})
+    cursor = db_rc_history.find({"real_mana": None, "timestamp": {"$gte": earliest_data}}, {"_id": 0})
     data = []
     async for doc in cursor:
         data.append(doc)
