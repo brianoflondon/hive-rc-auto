@@ -66,11 +66,11 @@ def build_rc_graph(
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     fig.add_trace(
         go.Scatter(x=dfa.age_hours, y=dfa["real_mana_percent"], name="RC %"),
-        secondary_y=False,
+        secondary_y=True,
     )
     fig.add_trace(
         go.Scatter(x=dfa.age_hours, y=dfa["real_mana"], name="RC"),
-        secondary_y=True,
+        secondary_y=False,
     )
 
     # Very expensive shows each change
@@ -95,11 +95,11 @@ def build_rc_graph(
         )
     )
     # Set y-axes titles
-    fig.update_yaxes(title_text="<b>RC %</b>", secondary_y=False)
-    fig.update_yaxes(title_text="<b>RC</b>", secondary_y=True)
+    fig.update_yaxes(title_text="<b>RC %</b>", secondary_y=True)
+    fig.update_yaxes(title_text="<b>RC</b>", secondary_y=False)
 
     yaxes_range_max = dfa["real_mana_percent"].max() + 5
-    fig.update_yaxes(range=[0, yaxes_range_max], secondary_y=False)
+    fig.update_yaxes(range=[0, yaxes_range_max], secondary_y=True)
 
     fig.update_layout(
         showlegend=True,
@@ -116,12 +116,11 @@ def build_rc_graph(
 
 async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Fetch data from Mongodb
-    db_name = "rc_history_testnet" if Config.TESTNET else "rc_history"
-    db_rc_history = get_mongo_db(db_name)
+    db_rc_ts = get_mongo_db(Config.DB_NAME)
     time_limit = timedelta(hours=st.session_state.hours)
     earliest_data = datetime.utcnow() - time_limit
 
-    cursor = db_rc_history.find(
+    cursor = db_rc_ts.find(
         {"real_mana": {"$ne": None}, "timestamp": {"$gte": earliest_data}}, {"_id": 0}
     )
 
@@ -134,7 +133,8 @@ async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     df.set_index("timestamp", inplace=True)
     df["age_hours"] = df["age"].dt.total_seconds() / 3600
 
-    cursor = db_rc_history.find({"real_mana": None, "timestamp": {"$gte": earliest_data}}, {"_id": 0})
+    db_rc_ts_deleg = get_mongo_db(Config.DB_NAME_DELEG)
+    cursor = db_rc_ts_deleg.find({"timestamp": {"$gte": earliest_data}}, {"_id": 0})
     data = []
     async for doc in cursor:
         data.append(doc)
