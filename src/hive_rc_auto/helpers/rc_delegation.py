@@ -5,16 +5,11 @@ from typing import Any, Callable, List, Tuple
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
-    HiveTrx,
-    get_client,
-    get_delegated_posting_auth_accounts,
-    get_rcs,
-    get_tracking_accounts,
-    make_lighthive_call,
-    send_custom_json,
-)
+    HiveTrx, get_client, get_delegated_posting_auth_accounts, get_rcs,
+    get_tracking_accounts, make_lighthive_call, send_custom_json)
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pydantic import BaseModel, Field
+from pymongo.errors import ServerSelectionTimeoutError
 
 
 def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
@@ -532,7 +527,14 @@ class RCAllData(BaseModel):
         db_name = "rc_history_testnet" if Config.TESTNET else "rc_history"
         db_rc_history = get_mongo_db(db_name)
         data = [rc.db_format for rc in self.rcs]
-        ans = await db_rc_history.insert_many(data)
+        try:
+            ans = await db_rc_history.insert_many(data)
+        except ServerSelectionTimeoutError as ex:
+            logging.error("Can't reach Database")
+            logging.error(ex)
+        except Exception as ex:
+            logging.error("problem writing to Database")
+        logging.error(ex)
 
 
 async def get_rc_of_accounts(
