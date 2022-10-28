@@ -5,16 +5,60 @@ from typing import Any, Callable, List, Tuple
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
-    HiveTrx, get_client, get_delegated_posting_auth_accounts, get_rcs,
-    get_tracking_accounts, make_lighthive_call, send_custom_json)
+    HiveTrx,
+    get_client,
+    get_delegated_posting_auth_accounts,
+    get_rcs,
+    get_tracking_accounts,
+    make_lighthive_call,
+    send_custom_json,
+)
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pydantic import BaseModel, Field
+from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 
 
 def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
     """Returns the MongoDB"""
     return AsyncIOMotorClient(Config.DB_CONNECTION)["podping"][collection]
+
+
+def setup_mongo_db() -> int:
+    """Check if the DB exists and set it up if needed. Returns number of new DBs"""
+    count = 0
+    for db_name in [Config.DB_NAME, Config.DB_NAME_DELEG]:
+        if check_setup_db(db_name):
+            count += 1
+    return count
+
+
+def check_setup_db(db_name: str) -> bool:
+    db = MongoClient(Config.DB_CONNECTION)["podping"]
+    collection_names = db.list_collection_names()
+    if db_name in collection_names:
+        logging.info(f"DB: {db_name} found in DB: {collection_names}")
+        return False
+
+    if "deleg" in db_name.lower():
+        meta_field = "deleg"
+    else:
+        meta_field = "account"
+
+    # Create timeseries collection:
+    db.create_collection(
+        db_name,
+        timeseries={
+            "timeField": "timestamp",
+            "metaField": meta_field,
+            "granularity": "seconds",
+        },
+    )
+    logging.info(f"DB: {db_name} created in database")
+    return True
+
+
+
 
 
 def get_utc_now_timestamp() -> datetime:
@@ -66,6 +110,7 @@ class RCDirectDelegation(BaseModel):
     def db_format(self, trx: HiveTrx) -> dict:
         ans = {}
         ans["timestamp"] = get_utc_now_timestamp()
+        ans["deleg"] = {"acc_from" : self.acc_from, "acc_to" : self.acc_to}
         ans["account"] = self.acc_to
         ans = ans | self.dict() | trx.dict()
         return ans
@@ -432,10 +477,7 @@ class RCAllData(BaseModel):
                     )
                     if trx:
                         logging.info(f"Custom Json: {trx.trx_num}")
-                        db_name = (
-                            "rc_history_testnet" if Config.TESTNET else "rc_history"
-                        )
-                        db_delegations = get_mongo_db(db_name)
+                        db_delegations = get_mongo_db(Config.DB_NAME_DELEG)
                         await db_delegations.insert_many(
                             [pd.db_format(trx=trx) for pd in self.pending_delegations]
                         )
@@ -524,8 +566,7 @@ class RCAllData(BaseModel):
 
     async def store_all_data(self):
         """Store all this item's relevant data in a MongoDB"""
-        db_name = "rc_history_testnet" if Config.TESTNET else "rc_history"
-        db_rc_history = get_mongo_db(db_name)
+        db_rc_history = get_mongo_db(Config.DB_NAME)
         data = [rc.db_format for rc in self.rcs]
         try:
             ans = await db_rc_history.insert_many(data)
@@ -534,7 +575,7 @@ class RCAllData(BaseModel):
             logging.error(ex)
         except Exception as ex:
             logging.error("problem writing to Database")
-        logging.error(ex)
+            logging.error(ex)
 
 
 async def get_rc_of_accounts(
