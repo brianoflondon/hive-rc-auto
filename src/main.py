@@ -149,7 +149,7 @@ async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def hours_selectbox():
-    hours_selectbox_options = [4, 8, 24]
+    hours_selectbox_options = [4, 8, 24, 72]
     cols = st.columns(2)
     cols[0].subheader("RC Levels")
     st.session_state.hours = cols[1].selectbox(
