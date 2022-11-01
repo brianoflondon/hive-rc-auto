@@ -28,7 +28,7 @@
             "cwd": "${workspaceFolder}/src/",
             "args": [
                 "run",
-                "main.py"
+                "RC_Overview.py"
             ],
             "justMyCode": true
         }
