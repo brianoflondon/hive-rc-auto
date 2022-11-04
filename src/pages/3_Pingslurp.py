@@ -42,6 +42,7 @@ result = client["pingslurp"]["meta_ts"].aggregate(
 df = pd.DataFrame(result)
 df.set_index("timestamp", inplace=True)
 all_accounts = df.account.unique()
+all_accounts.sort()
 fig = make_subplots(specs=[[{"secondary_y": True}]])
 # fig.add_trace(
 #     go.Scatter(x=df_no_account.index, y=df_no_account.total_iris, name="All Iris")
@@ -58,12 +59,12 @@ for account in all_accounts:
     )
 
 fig.update_layout(
-    legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="right", x=0.9)
+    legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="right", x=0.9)
 )
 fig.update_layout(title_x=0.2, title_y=0.2)
 fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
 
-st.title("Pings per Hour by each account")
+st.title("IRIs Sent per Hour by each account")
 st.plotly_chart(fig, use_container_width=True)
 
 
@@ -116,6 +117,7 @@ result = client['pingslurp']['meta_ts'].aggregate([
 df_hour = pd.DataFrame(result)
 df_hour.set_index("timestamp", inplace=True)
 all_accounts = df_hour.account.unique()
+all_accounts.sort()
 fig2 = make_subplots(specs=[[{"secondary_y": True}]])
 for account in all_accounts:
     fig2.add_trace(
@@ -124,14 +126,16 @@ for account in all_accounts:
             y=df_hour[df_hour.account == account].total_iris,
             name=account,
             mode="markers",
+            marker=dict(size=10 + df_hour[df_hour.account == account].total_size/512)
         ),
+
         secondary_y=True,
     )
 
 fig2.update_layout(
-    legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="right", x=0.9)
+    legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="right", x=0.9)
 )
 fig2.update_layout(title_x=0.2, title_y=0.2)
 fig2.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
-st.title("Last 2 hours of pings per minute by Accounts")
+st.title("Last 2 hours of IRIs per minute by Accounts")
 st.plotly_chart(fig2, use_container_width=True)
