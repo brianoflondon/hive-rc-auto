@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -65,5 +65,72 @@ fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
 st.set_page_config(layout="wide")
 st.plotly_chart(fig, use_container_width=True)
 
-# fig.show()
-# st.markdown("")
+
+
+time_frame = 'minute'
+time_limit =  datetime.utcnow() - timedelta(hours=1)
+result = client['pingslurp']['meta_ts'].aggregate([
+    {
+        '$match':
+            {
+            'timestamp': {'$gt': time_limit},
+            }
+    },{
+        '$group': {
+            '_id': {
+                'account': '$metadata.posting_auth',
+                'timestamp': {
+                    '$dateTrunc': {
+                        'date': '$timestamp',
+                        'unit': time_frame,
+                        'timezone': 'Asia/Jerusalem'
+                    }
+                }
+            },
+            'timestamp' :{
+                '$first': '$timestamp' },
+            'account': {
+                '$first': '$metadata.posting_auth'
+            },
+            'avg_size': {
+                '$avg': '$json_size'
+            },
+            'total_size': {
+                '$sum': '$json_size'
+            },
+            'total_podpings': {
+                '$sum': 1
+            },
+            'total_iris': {
+                '$sum': '$num_iris'
+            }
+        }
+    }, {
+        '$sort': {
+            '_id.timestamp': -1
+        }
+    }
+])
+
+df_hour = pd.DataFrame(result)
+df_hour.set_index("timestamp", inplace=True)
+all_accounts = df_hour.account.unique()
+fig2 = make_subplots(specs=[[{"secondary_y": True}]])
+for account in all_accounts:
+    fig2.add_trace(
+        go.Scatter(
+            x=df_hour[df_hour.account == account].index,
+            y=df_hour[df_hour.account == account].total_iris,
+            name=account,
+            mode="markers",
+        ),
+        secondary_y=True,
+    )
+
+fig2.update_layout(
+    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="right", x=0.9)
+)
+fig2.update_layout(title_x=0.2, title_y=0.2)
+fig2.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
+
+st.plotly_chart(fig2, use_container_width=True)
