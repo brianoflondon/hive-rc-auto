@@ -10,7 +10,7 @@ from pymongo import MongoClient
 DB_CONNECTION = "mongodb://cepo-v4vapp:27017/"
 
 client = MongoClient(DB_CONNECTION)
-
+st.set_page_config(layout="wide")
 time_frame = "hour"
 result = client["pingslurp"]["meta_ts"].aggregate(
     [
@@ -58,11 +58,12 @@ for account in all_accounts:
     )
 
 fig.update_layout(
-    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="right", x=0.9)
+    legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="right", x=0.9)
 )
 fig.update_layout(title_x=0.2, title_y=0.2)
 fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
-st.set_page_config(layout="wide")
+
+st.title("Pings per Hour by each account")
 st.plotly_chart(fig, use_container_width=True)
 
 
@@ -128,9 +129,9 @@ for account in all_accounts:
     )
 
 fig2.update_layout(
-    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="right", x=0.9)
+    legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="right", x=0.9)
 )
 fig2.update_layout(title_x=0.2, title_y=0.2)
 fig2.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
-
+st.title("Last 2 hours of pings per minute by Accounts")
 st.plotly_chart(fig2, use_container_width=True)
