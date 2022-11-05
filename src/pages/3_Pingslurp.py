@@ -67,10 +67,10 @@ fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
 st.title("IRIs Sent per Hour by each account")
 st.plotly_chart(fig, use_container_width=True)
 
-
+number_hours = 4
 
 time_frame = 'minute'
-time_limit =  datetime.utcnow() - timedelta(hours=1)
+time_limit =  datetime.utcnow() - timedelta(hours=number_hours)
 result = client['pingslurp']['meta_ts'].aggregate([
     {
         '$match':
@@ -137,5 +137,5 @@ fig2.update_layout(
 )
 fig2.update_layout(title_x=0.2, title_y=0.2)
 fig2.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
-st.title("Last 2 hours of IRIs per minute by Accounts")
+st.title(f"Last {number_hours} hours of IRIs per minute by Accounts")
 st.plotly_chart(fig2, use_container_width=True)
