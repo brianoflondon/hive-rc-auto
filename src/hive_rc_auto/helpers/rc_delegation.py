@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, List, Tuple, Union
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pydantic import BaseModel, Field
@@ -116,7 +116,7 @@ class RCDirectDelegation(BaseModel):
         return ans
 
     @property
-    def payload_item(self) -> List[dict]:
+    def payload_item(self) -> List[str | dict[str, str | list[str] | int]]:
         return [
             "delegate_rc",
             {
@@ -546,7 +546,7 @@ class RCAllData(BaseModel):
 
     async def which_account_to_cut_delegation_from(
         self, target: str, amount: int
-    ) -> Tuple[str, int]:
+    ) -> Union[Tuple[str, int],None]:
         """Which delegating account can we reduce delegation from to drop delegation
         by the target amount"""
         rc = self._get_rcs(target)
