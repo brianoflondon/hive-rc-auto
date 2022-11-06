@@ -13,6 +13,10 @@ services:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "python bot.py"
     restart: unless-stopped
+    networks:
+      - pingslurp
+      - hive-network
+
 
   rc_dash:
     container_name: rc_dash
@@ -27,9 +31,13 @@ services:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "streamlit run RC_Overview.py"
     restart: unless-stopped
-
+    networks:
+      - pingslurp
+      - hive-network
 
 
 networks:
-  default:
-    name: v4vapi_default
+  pingslurp:
+    external: true
+  hive-network:
+    external: true
