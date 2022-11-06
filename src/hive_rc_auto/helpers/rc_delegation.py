@@ -3,6 +3,11 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, List, Tuple
 
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
+from pydantic import BaseModel, Field
+from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError
+
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
     HiveTrx,
@@ -13,15 +18,13 @@ from hive_rc_auto.helpers.hive_calls import (
     make_lighthive_call,
     send_custom_json,
 )
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
-from pydantic import BaseModel, Field
-from pymongo import MongoClient
-from pymongo.errors import ServerSelectionTimeoutError
+
+DB_NAME = "rc_podping"
 
 
 def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
     """Returns the MongoDB"""
-    return AsyncIOMotorClient(Config.DB_CONNECTION)["podping"][collection]
+    return AsyncIOMotorClient(Config.DB_CONNECTION)[DB_NAME][collection]
 
 
 def setup_mongo_db() -> int:
@@ -34,7 +37,7 @@ def setup_mongo_db() -> int:
 
 
 def check_setup_db(db_name: str) -> bool:
-    db = MongoClient(Config.DB_CONNECTION)["podping"]
+    db = MongoClient(Config.DB_CONNECTION)[DB_NAME]
     collection_names = db.list_collection_names()
     if db_name in collection_names:
         logging.info(f"DB: {db_name} found in DB: {collection_names}")
@@ -56,9 +59,6 @@ def check_setup_db(db_name: str) -> bool:
     )
     logging.info(f"DB: {db_name} created in database")
     return True
-
-
-
 
 
 def get_utc_now_timestamp() -> datetime:
@@ -110,7 +110,7 @@ class RCDirectDelegation(BaseModel):
     def db_format(self, trx: HiveTrx) -> dict:
         ans = {}
         ans["timestamp"] = get_utc_now_timestamp()
-        ans["deleg"] = {"acc_from" : self.acc_from, "acc_to" : self.acc_to}
+        ans["deleg"] = {"acc_from": self.acc_from, "acc_to": self.acc_to}
         ans["account"] = self.acc_to
         ans = ans | self.dict() | trx.dict()
         return ans

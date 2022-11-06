@@ -50,7 +50,7 @@ def get_client(
                 "https://api.deathwing.me",
                 # "https://hive-api.arcange.eu",
                 "https://api.openhive.network",
-                " https://rpc.ausbit.dev",
+                "https://rpc.ausbit.dev",
             ]
         client = Client(
             keys=posting_keys,
