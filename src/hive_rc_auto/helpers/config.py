@@ -45,9 +45,11 @@ class Config:
             DB_NAME = "testnet_" + DB_NAME
 
         DB_NAME_DELEG = DB_NAME + "_deleg"
-        
+
         if not DB_CONNECTION:
             DB_CONNECTION = "mongodb://127.0.0.1:27017"
+
+        MINIMUM_DELEGATION=10_000_000_000
 
     except AttributeError as ex:
         logging.exception(ex)

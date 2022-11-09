@@ -45,6 +45,7 @@ def get_client(
             chain = {"chain_id": os.getenv("TESTNET_CHAINID")}
         else:
             nodes = [
+                "https://rpc.podping.org",
                 "https://hived.emre.sh",
                 "https://api.hive.blog",
                 "https://api.deathwing.me",

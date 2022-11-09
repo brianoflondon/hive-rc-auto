@@ -3,6 +3,7 @@ import logging
 from typing import List
 
 import pytest
+from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.rc_delegation import (
     RCAllData,
     RCDirectDelegation,
@@ -33,7 +34,7 @@ async def test_send_delegations_custom_json():
                 {
                     "from": acc,
                     "to": test_acc,
-                    "delegated_rc": 1_033_000,
+                    "delegated_rc": Config.MINIMUM_DELEGATION,
                     "cut": False,
                 }
             )

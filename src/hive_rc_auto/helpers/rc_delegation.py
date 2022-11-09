@@ -77,11 +77,12 @@ class RCAccType(str, Enum):
 
 
 def mill(input: float) -> int:
-    """Divide by 1 million"""
+    """Divide by 1 million retuns int"""
     return round(input / 1e6)
 
 
 def mill_s(input: float) -> str:
+    """Divide by 1 million and return a string"""
     m = mill(input)
     return f"{m:>12,} M"
 
@@ -136,6 +137,7 @@ class RCDirectDelegation(BaseModel):
             return "| Increasing ^"
 
     def log_line_output(self, logger: Callable):
+        """Send a formated line to the logger passed"""
         logger(
             f"{self.acc_from:<16} -> {self.acc_to} | "
             f"{mill(self.delegated_rc):>12,} M"
@@ -282,6 +284,8 @@ class RCAccount(BaseModel):
         if self.status == RCStatus.LOW:
             percent_gap = Config.RC_PCT_LOWER_TARGET - self.real_mana_percent
             new_amount = self.max_rc * (1 + ((percent_gap) / 100))
+            if new_amount < Config.MINIMUM_DELEGATION:
+                new_amount = 0
             return new_amount
         if self.status == RCStatus.HIGH and self.delta_percent > 0:
             percent_gap = (self.real_mana_percent - Config.RC_PCT_UPPER_TARGET) + 2
