@@ -10,17 +10,18 @@ from pymongo import MongoClient
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
 
-st.set_page_config(layout="wide")
-st.markdown("# Podping Health")
-st.sidebar.markdown("# Podping Health")
 time_frame = "minute"
+bin_size = 60
 start_date = datetime.utcnow() - timedelta(hours=72)
+end_data = datetime.utcnow() - timedelta(hours=0)
 result = CLIENT["pingslurp"]["hosts_ts"].aggregate(
     [
         {
             "$match": {
-                "timestamp": {"$gt": start_date},
-                # 'metadata.host': 'Transistor'
+                "$and": [
+                    {"timestamp": {"$gt": start_date}},
+                    {"timestamp": {"$lt": end_data}},
+                ]
             }
         },
         {
@@ -32,7 +33,7 @@ result = CLIENT["pingslurp"]["hosts_ts"].aggregate(
                             "date": "$timestamp",
                             "unit": time_frame,
                             "timezone": "Asia/Jerusalem",
-                            "binSize": 60,
+                            "binSize": bin_size,
                         }
                     },
                 },
@@ -53,7 +54,10 @@ result_total = CLIENT["pingslurp"]["hosts_ts"].aggregate(
     [
         {
             "$match": {
-                "timestamp": {"$gt": start_date},
+                "$and": [
+                    {"timestamp": {"$gt": start_date}},
+                    {"timestamp": {"$lt": end_data}},
+                ]
             }
         },
         {
@@ -64,7 +68,7 @@ result_total = CLIENT["pingslurp"]["hosts_ts"].aggregate(
                             "date": "$timestamp",
                             "unit": time_frame,
                             "timezone": "Asia/Jerusalem",
-                            "binSize": 60,
+                            "binSize": bin_size,
                         }
                     }
                 },
@@ -90,8 +94,17 @@ df_total["avg4H"] = df_total["total_iris"].rolling(window="4H", center=True).mea
 df_total["avg8H"] = df_total["total_iris"].rolling(window="8H", center=True).mean()
 df_total["avg24H"] = df_total["total_iris"].rolling(window="24H", center=True).mean()
 
+result_recent_ping = CLIENT["pingslurp"]["hosts_ts"].aggregate(
+    [
+        {"$sort": {"timestamp": -1}},
+        {"$group": {"_id": "$metadata.host", "timestamp": {"$first": "$timestamp"}}},
+    ]
+)
+df_recent_ping = pd.DataFrame(result_recent_ping)
+df_recent_ping["age"] = datetime.utcnow() - df_recent_ping["timestamp"]
+df_recent_ping.rename(columns={"_id": "host"}, inplace=True)
+
 hosts_sorted = df.host.unique()
-hosts_sorted.sort(kind="stable")
 
 for host in df.host.unique():
     df.loc[df.host == host, "cum_iris"] = df[df.host == host]["total_iris"].cumsum()
@@ -142,8 +155,8 @@ df_summary = pd.DataFrame(data=summary)
 
 
 def gauge(host: str):
-    value = int(df_summary[df_summary.host == host].hour_0)
-    reference = int(df_summary[df_summary.host == host].hour_1)
+    value = int(df_summary[df_summary.host == host].hour_1)
+    reference = int(df_summary[df_summary.host == host].hour_2)
     min_val = int(df_summary[df_summary.host == host].min_val)
     max_val = int(df_summary[df_summary.host == host].max_val)
     avg4H = int(df_summary[df_summary.host == host].avg4H)
@@ -171,23 +184,37 @@ def gauge(host: str):
         )
     )
 
-    fig.update_layout(margin=dict(b=10, t=20, l=5, r=5, autoexpand=True))
+    fig.update_layout(margin=dict(b=10, t=20, l=10, r=10, autoexpand=True))
     fig.update_layout(title=dict(font=dict(size=20)))
     fig.update_layout(height=150)
     # fig.update_layout(title_text=host)
     return fig
 
 
-ncol = 6
-st.subheader("Total Iris sent in the last Hour")
+st.set_page_config(layout="wide")
+top_cols = st.columns(2)
+top_cols[0].markdown("# Podping Health")
+st.sidebar.markdown("# Podping Health")
+
+ncol = 5
+top_cols[0].subheader("Total Iris sent in the last Hour")
+fig = gauge("Total")
+top_cols[1].plotly_chart(fig, use_container_width=True)
 cols = st.columns(ncol)
 # cols[0].plotly_chart(gauge("Total"), use_container_width=True)
 
+def seconds_only(time_delta: timedelta) -> timedelta:
+    """Strip out microseconds"""
+    return time_delta - timedelta(microseconds=time_delta.microseconds)
 
-for i, host in enumerate(["Total", *hosts_sorted]):
+
+hosts = df_summary.sort_values(by="hour_0", ascending=False)["host"]
+for i, host in enumerate(hosts.iloc[1:]):
     fig = gauge(host=host)
     cols[i % ncol].plotly_chart(fig, use_container_width=True)
-    cols[i % ncol].subheader(host)
+    last_ping = df_recent_ping[df_recent_ping['host'] == host].age.iloc[0]
+    cols[i % ncol].subheader(f"{host}")
+    cols[i % ncol].text(f"Last Ping: {seconds_only(last_ping)}")
 
 
 fig_graph = go.Figure()
@@ -195,9 +222,12 @@ fig_graph.add_trace(
     go.Scatter(x=df_total.index, y=df_total.avg8H, mode="lines", name="8hr Moving Avg")
 )
 fig_graph.add_trace(
-    go.Scatter(x=df_total.index, y=df_total.total_iris, mode="markers", name="Total IRIs/hour")
+    go.Scatter(
+        x=df_total.index, y=df_total.total_iris, mode="markers", name="Total IRIs/hour"
+    )
 )
 st.plotly_chart(fig_graph, use_container_width=True)
 
 # st.dataframe(df)
+st.dataframe(df_recent_ping)
 st.dataframe(df_summary)
