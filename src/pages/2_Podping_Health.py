@@ -171,11 +171,12 @@ def gauge(host: str):
         )
     )
 
-    fig.update_layout(margin=dict(b=10, t=20, l=5, r=5))
+    fig.update_layout(margin=dict(b=10, t=20, l=5, r=5, autoexpand=True))
     fig.update_layout(title=dict(font=dict(size=20)))
     fig.update_layout(height=150)
     # fig.update_layout(title_text=host)
     return fig
+
 
 ncol = 6
 st.subheader("Total Iris sent in the last Hour")
@@ -189,5 +190,14 @@ for i, host in enumerate(["Total", *hosts_sorted]):
     cols[i % ncol].subheader(host)
 
 
+fig_graph = go.Figure()
+fig_graph.add_trace(
+    go.Scatter(x=df_total.index, y=df_total.avg8H, mode="lines", name="8hr Moving Avg")
+)
+fig_graph.add_trace(
+    go.Scatter(x=df_total.index, y=df_total.total_iris, mode="markers", name="Total IRIs/hour")
+)
+st.plotly_chart(fig_graph, use_container_width=True)
+
 # st.dataframe(df)
-# st.dataframe(df_total)
+st.dataframe(df_summary)

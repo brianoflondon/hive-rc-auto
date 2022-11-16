@@ -167,6 +167,10 @@ fig.update_layout(
 fig.update_layout(title_x=0.2, title_y=0.2)
 fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
 
+end_range = datetime.utcnow() + timedelta(hours=0.5)
+start_range = end_range - timedelta(days=30)
+fig.update_layout(xaxis=dict(range=[start_range,end_range]))
+
 st.title("IRIs Sent per Hour by each account")
 st.plotly_chart(fig, use_container_width=True)
 
