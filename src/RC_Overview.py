@@ -180,7 +180,7 @@ async def grid(ncol: int = 2):
     for hive_acc in all_accounts:
         dfa = df[df.account == hive_acc]
         if dfa.real_mana_percent.iloc[-1] < 95 and (
-            not df.delegating.iloc[-1] == "delegating"
+            not dfa.delegating.iloc[-1] == "delegating"
         ):
             filtered_accounts.append(hive_acc)
 
