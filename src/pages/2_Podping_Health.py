@@ -203,6 +203,7 @@ top_cols[1].plotly_chart(fig, use_container_width=True)
 cols = st.columns(ncol)
 # cols[0].plotly_chart(gauge("Total"), use_container_width=True)
 
+
 def seconds_only(time_delta: timedelta) -> timedelta:
     """Strip out microseconds"""
     return time_delta - timedelta(microseconds=time_delta.microseconds)
@@ -212,7 +213,7 @@ hosts = df_summary.sort_values(by="hour_0", ascending=False)["host"]
 for i, host in enumerate(hosts.iloc[1:]):
     fig = gauge(host=host)
     cols[i % ncol].plotly_chart(fig, use_container_width=True)
-    last_ping = df_recent_ping[df_recent_ping['host'] == host].age.iloc[0]
+    last_ping = df_recent_ping[df_recent_ping["host"] == host].age.iloc[0]
     cols[i % ncol].subheader(f"{host}")
     cols[i % ncol].text(f"Last Ping: {seconds_only(last_ping)}")
 
@@ -226,8 +227,21 @@ fig_graph.add_trace(
         x=df_total.index, y=df_total.total_iris, mode="markers", name="Total IRIs/hour"
     )
 )
+
+# df_recent_ping.set_index("timestamp", inplace=True)
+# for index, ping in df_recent_ping.iterrows():
+#     fig.add_vline(
+#         x= 0,
+#         line_width=3,
+#         line_dash="dash",
+#         line_color="green",
+#         annotation_text=ping['host'],
+#         annotation_position="top right",
+#     )
+
+
 st.plotly_chart(fig_graph, use_container_width=True)
 
 # st.dataframe(df)
-st.dataframe(df_recent_ping)
+# st.dataframe(df_recent_ping[['host','timestamp']])
 st.dataframe(df_summary)
