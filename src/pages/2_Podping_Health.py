@@ -103,6 +103,8 @@ result_recent_ping = CLIENT["pingslurp"]["hosts_ts"].aggregate(
 df_recent_ping = pd.DataFrame(result_recent_ping)
 df_recent_ping["age"] = datetime.utcnow() - df_recent_ping["timestamp"]
 df_recent_ping.rename(columns={"_id": "host"}, inplace=True)
+df_recent_ping.set_index('timestamp', inplace=True)
+df_recent_ping.sort_index(inplace=True, ascending=False)
 
 hosts_sorted = df.host.unique()
 
@@ -123,19 +125,21 @@ summary = []
 
 for host in hosts_sorted:
     dfa = df.loc[df.host == host]
-    summary.append(
-        {
-            "host": dfa["host"].iloc[0],
-            "hour_0": dfa["total_iris"].iloc[0],
-            "hour_1": dfa["total_iris"].iloc[1],
-            "hour_2": dfa["total_iris"].iloc[2],
-            "avg4H": dfa["avg4H"].iloc[0],
-            "avg8H": dfa["avg8H"].iloc[0],
-            "avg24H": dfa["avg24H"].iloc[0],
-            "max_val": dfa["total_iris"].max(),
-            "min_val": dfa["total_iris"].min(),
-        }
-    )
+    if not dfa.empty and len(dfa) > 1:
+        print(dfa["host"].iloc[0])
+        summary.append(
+            {
+                "host": dfa["host"].iloc[0],
+                "hour_0": dfa["total_iris"].iloc[0],
+                "hour_1": dfa["total_iris"].iloc[1],
+                "hour_2": dfa["total_iris"].iloc[2],
+                "avg4H": dfa["avg4H"].iloc[0],
+                "avg8H": dfa["avg8H"].iloc[0],
+                "avg24H": dfa["avg24H"].iloc[0],
+                "max_val": dfa["total_iris"].max(),
+                "min_val": dfa["total_iris"].min(),
+            }
+        )
 
 summary.append(
     {
@@ -184,7 +188,7 @@ def gauge(host: str):
         )
     )
 
-    fig.update_layout(margin=dict(b=10, t=20, l=10, r=10, autoexpand=True))
+    fig.update_layout(margin=dict(b=10, t=20, l=15, r=15, autoexpand=True))
     fig.update_layout(title=dict(font=dict(size=20)))
     fig.update_layout(height=150)
     # fig.update_layout(title_text=host)
@@ -200,16 +204,16 @@ ncol = 5
 top_cols[0].subheader("Total Iris sent in the last Hour")
 fig = gauge("Total")
 top_cols[1].plotly_chart(fig, use_container_width=True)
+top_cols[1].subheader("Total")
+st.sidebar.plotly_chart(fig, use_container_width=True)
+st.sidebar.subheader("Total")
 cols = st.columns(ncol)
-# cols[0].plotly_chart(gauge("Total"), use_container_width=True)
-
 
 def seconds_only(time_delta: timedelta) -> timedelta:
     """Strip out microseconds"""
     return time_delta - timedelta(microseconds=time_delta.microseconds)
 
-
-hosts = df_summary.sort_values(by="hour_0", ascending=False)["host"]
+hosts = df_summary.sort_values(by="hour_1", ascending=False)["host"]
 for i, host in enumerate(hosts.iloc[1:]):
     fig = gauge(host=host)
     cols[i % ncol].plotly_chart(fig, use_container_width=True)
@@ -241,6 +245,10 @@ fig_graph.add_trace(
 
 
 st.plotly_chart(fig_graph, use_container_width=True)
+
+st.subheader("Most recent Podpings per major host")
+for index, ping in df_recent_ping.iterrows():
+    st.markdown(f"{ping.host:>20} - Last Podping: {ping.age}")
 
 # st.dataframe(df)
 # st.dataframe(df_recent_ping[['host','timestamp']])

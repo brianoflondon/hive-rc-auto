@@ -161,6 +161,10 @@ fig.add_trace(
     go.Scatter(x=df_no_account.index, y=df_no_account.total_iris, name="All Iris")
 )
 
+fig.add_trace(
+    go.Scatter(x=df_no_account.index, y=df_no_account.total_iris.rolling(4).mean(), name="All Iris (4H avg)")
+)
+
 fig.update_layout(
     legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="right", x=0.9)
 )
