@@ -5,11 +5,12 @@ import streamlit as st
 from hive_rc_auto.helpers.rc_delegation import RCDirectDelegation
 from RC_Overview import get_data
 
-st.markdown("# Details ❄️")
-st.sidebar.markdown("# Details ❄️")
+st.markdown("# RC Delegation Details")
+st.sidebar.markdown("# Details")
 
 try:
     df = st.session_state.df_rc_changes
+    df.sort_values(by='age', ascending=True, inplace=True)
     if not df.empty:
         df = df.drop(["deleg", "age", "trx_num", "trx_id", "block_num"], axis=1)
         st.dataframe(df)
