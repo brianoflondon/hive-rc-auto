@@ -180,8 +180,15 @@ fig.update_layout(
     legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="right", x=0.9)
 )
 fig.update_layout(margin={"autoexpand": True, "b": 20, "t": 0, "l": 0, "r": 0})
-fig.update_yaxes(title_text="All IRIs", secondary_y=False)
-fig.update_yaxes(title_text="IRIs by account", secondary_y=True)
+fig.update_yaxes(title_text="All IRIs", secondary_y=False, showgrid=False)
+fig.update_yaxes(title_text="IRIs by account", secondary_y=True, showgrid=False)
+
+fig.update_xaxes(showspikes=True)
+fig.update_yaxes(showspikes=True)
+# Grid lines
+# fig.update_xaxes(gridwidth=0.1, gridcolor="LightGrey")
+# fig.update_yaxes(showline=False, gridwidth=0.1)
+# fig.update_yaxes(gridwidth=0.1, secondary_y=True)
 
 fig.update_layout(title_x=0.05, title_y=0.95)
 fig.update_layout(title_text="IRIs Sent per Hour by each account")
@@ -189,6 +196,7 @@ fig.update_layout(title_text="IRIs Sent per Hour by each account")
 end_range = datetime.utcnow() + timedelta(hours=0.5)
 start_range = end_range - timedelta(days=30)
 fig.update_layout(xaxis=dict(range=[start_range, end_range]))
+
 
 st.title(body="IRIs Sent per Hour by each account")
 st.plotly_chart(fig, use_container_width=True)
@@ -229,12 +237,15 @@ fig2.update_layout(
 )
 fig2.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
 
-fig2.update_yaxes(title_text="All IRIs", secondary_y=False)
+fig2.update_yaxes(title_text="All IRIs", secondary_y=False, showgrid=False)
 fig2.update_layout(title_x=0.05, title_y=0.95)
 
-fig2.update_yaxes(title_text="IRIs by account", secondary_y=True)
+fig2.update_yaxes(title_text="IRIs by account", secondary_y=True, showgrid=False)
 fig2.update_layout(
     title_text=f"Last {number_hours} hours of IRIs per minute by Accounts"
 )
+
+fig2.update_xaxes(showspikes=True)
+fig2.update_yaxes(showspikes=True)
 st.title(f"Last {number_hours} hours of IRIs per minute by Accounts")
 st.plotly_chart(fig2, use_container_width=True)
