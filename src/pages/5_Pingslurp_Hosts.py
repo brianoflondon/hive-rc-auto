@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta
 
@@ -126,20 +127,23 @@ summary = []
 for host in hosts_sorted:
     dfa = df.loc[df.host == host]
     if not dfa.empty and len(dfa) > 1:
-        print(dfa["host"].iloc[0])
-        summary.append(
-            {
-                "host": dfa["host"].iloc[0],
-                "hour_0": dfa["total_iris"].iloc[0],
-                "hour_1": dfa["total_iris"].iloc[1],
-                "hour_2": dfa["total_iris"].iloc[2],
-                "avg4H": dfa["avg4H"].iloc[0],
-                "avg8H": dfa["avg8H"].iloc[0],
-                "avg24H": dfa["avg24H"].iloc[0],
-                "max_val": dfa["total_iris"].max(),
-                "min_val": dfa["total_iris"].min(),
-            }
-        )
+        try:
+            logging.info(dfa["host"].iloc[0])
+            summary.append(
+                {
+                    "host": dfa["host"].iloc[0],
+                    "hour_0": dfa["total_iris"].iloc[0],
+                    "hour_1": dfa["total_iris"].iloc[1],
+                    "hour_2": dfa["total_iris"].iloc[2],
+                    "avg4H": dfa["avg4H"].iloc[0],
+                    "avg8H": dfa["avg8H"].iloc[0],
+                    "avg24H": dfa["avg24H"].iloc[0],
+                    "max_val": dfa["total_iris"].max(),
+                    "min_val": dfa["total_iris"].min(),
+                }
+            )
+        except IndexError:
+            logging.warning(f"IndexError with {dfa['host'].iloc[0]}")
 
 summary.append(
     {
