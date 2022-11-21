@@ -7,7 +7,9 @@ import streamlit as st
 from plotly.subplots import make_subplots
 from pymongo import MongoClient
 
-from hive_rc_auto.helpers.markdown.static_text import ALL_MARKDOWN
+from hive_rc_auto.helpers.markdown.static_text import import_text
+
+ALL_MARKDOWN = import_text()
 
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
@@ -139,7 +141,7 @@ def hour_trans_no_account(time_limit: datetime, time_frame: str):
 
 st.set_page_config(layout="wide")
 
-st.sidebar.markdown(ALL_MARKDOWN['pingslurp_accounts'])
+st.sidebar.markdown(ALL_MARKDOWN["pingslurp_accounts"])
 
 time_frame = "hour"
 result = all_trans_by_account()
@@ -167,7 +169,11 @@ fig.add_trace(
 )
 
 fig.add_trace(
-    go.Scatter(x=df_no_account.index, y=df_no_account.total_iris.rolling(4).mean(), name="All Iris (4H avg)")
+    go.Scatter(
+        x=df_no_account.index,
+        y=df_no_account.total_iris.rolling(4).mean(),
+        name="All Iris (4H avg)",
+    )
 )
 
 fig.update_layout(
@@ -182,9 +188,9 @@ fig.update_layout(title_text="IRIs Sent per Hour by each account")
 
 end_range = datetime.utcnow() + timedelta(hours=0.5)
 start_range = end_range - timedelta(days=30)
-fig.update_layout(xaxis=dict(range=[start_range,end_range]))
+fig.update_layout(xaxis=dict(range=[start_range, end_range]))
 
-st.title("IRIs Sent per Hour by each account")
+st.title(body="IRIs Sent per Hour by each account")
 st.plotly_chart(fig, use_container_width=True)
 
 number_hours = 4
@@ -227,6 +233,8 @@ fig2.update_yaxes(title_text="All IRIs", secondary_y=False)
 fig2.update_layout(title_x=0.05, title_y=0.95)
 
 fig2.update_yaxes(title_text="IRIs by account", secondary_y=True)
-fig2.update_layout(title_text=f"Last {number_hours} hours of IRIs per minute by Accounts")
+fig2.update_layout(
+    title_text=f"Last {number_hours} hours of IRIs per minute by Accounts"
+)
 st.title(f"Last {number_hours} hours of IRIs per minute by Accounts")
 st.plotly_chart(fig2, use_container_width=True)

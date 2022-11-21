@@ -14,8 +14,10 @@ from plotly.subplots import make_subplots
 from streamlit_autorefresh import st_autorefresh
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.markdown.static_text import ALL_MARKDOWN
+from hive_rc_auto.helpers.markdown.static_text import import_text
 from hive_rc_auto.helpers.rc_delegation import RCAccount, get_mongo_db
+
+ALL_MARKDOWN = import_text()
 
 
 def rc_guage(rc: RCAccount):
@@ -227,7 +229,7 @@ async def main_loop():
         st.session_state.hours = 24
     hours_selectbox()
     await grid(ncol=3)
-    st.markdown(ALL_MARKDOWN['rc_overview.md'])
+    st.markdown(ALL_MARKDOWN["rc_overview"])
 
     # await rerun_after_data_update()
 
@@ -250,7 +252,7 @@ if __name__ == "__main__":
         initial_sidebar_state="expanded",
     )
     st.sidebar.markdown("# RC Overview 📈")
-    st.sidebar.markdown(ALL_MARKDOWN['rc_overview.md'])
+    st.sidebar.markdown(ALL_MARKDOWN["rc_overview"])
     # try:
     asyncio.run(main_loop())
     # except KeyboardInterrupt:

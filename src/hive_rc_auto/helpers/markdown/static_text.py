@@ -1,15 +1,15 @@
-from os.path import dirname, join, exists, split
-from pathlib import Path
 from glob import glob
+from os.path import dirname, exists, join, split
+from pathlib import Path
 
-# files = ['rc_overview.md', 'podping_health.md', 'pings']
+ALL_MARKDOWN = {}
 
-ALL_MARKDOWN= {}
 
-files = glob(f"{dirname(__file__)}/*.md")
-
-for filepath in files:
-    if exists(filepath):
-        with open(filepath, 'r') as f:
-            file = Path(filepath).stem
-            ALL_MARKDOWN[file] = f.read()
+def import_text():
+    files = glob(f"{dirname(__file__)}/*.md")
+    for filepath in files:
+        if exists(filepath):
+            with open(filepath, "r") as f:
+                file = Path(filepath).stem
+                ALL_MARKDOWN[file] = f.read()
+    return ALL_MARKDOWN

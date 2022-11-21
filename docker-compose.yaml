@@ -31,7 +31,7 @@ services:
       - "127.0.1.1:8501:8501"
     # environment:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
-    command: bash -c "streamlit run RC_Overview.py"
+    command: bash -c "streamlit run Podping.py"
     restart: unless-stopped
     networks:
       - pingslurp_pingslurp
