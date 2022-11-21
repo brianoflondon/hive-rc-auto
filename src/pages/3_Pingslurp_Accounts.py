@@ -7,6 +7,8 @@ import streamlit as st
 from plotly.subplots import make_subplots
 from pymongo import MongoClient
 
+from hive_rc_auto.helpers.markdown.static_text import ALL_MARKDOWN
+
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
 
@@ -136,6 +138,9 @@ def hour_trans_no_account(time_limit: datetime, time_frame: str):
 
 
 st.set_page_config(layout="wide")
+
+st.sidebar.markdown(ALL_MARKDOWN['pingslurp_accounts'])
+
 time_frame = "hour"
 result = all_trans_by_account()
 df = pd.DataFrame(result)
@@ -168,8 +173,12 @@ fig.add_trace(
 fig.update_layout(
     legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="right", x=0.9)
 )
-fig.update_layout(title_x=0.2, title_y=0.2)
-fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
+fig.update_layout(margin={"autoexpand": True, "b": 20, "t": 0, "l": 0, "r": 0})
+fig.update_yaxes(title_text="All IRIs", secondary_y=False)
+fig.update_yaxes(title_text="IRIs by account", secondary_y=True)
+
+fig.update_layout(title_x=0.05, title_y=0.95)
+fig.update_layout(title_text="IRIs Sent per Hour by each account")
 
 end_range = datetime.utcnow() + timedelta(hours=0.5)
 start_range = end_range - timedelta(days=30)
@@ -212,7 +221,12 @@ fig2.add_trace(
 fig2.update_layout(
     legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="right", x=0.9)
 )
-fig2.update_layout(title_x=0.2, title_y=0.2)
 fig2.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
+
+fig2.update_yaxes(title_text="All IRIs", secondary_y=False)
+fig2.update_layout(title_x=0.05, title_y=0.95)
+
+fig2.update_yaxes(title_text="IRIs by account", secondary_y=True)
+fig2.update_layout(title_text=f"Last {number_hours} hours of IRIs per minute by Accounts")
 st.title(f"Last {number_hours} hours of IRIs per minute by Accounts")
 st.plotly_chart(fig2, use_container_width=True)
