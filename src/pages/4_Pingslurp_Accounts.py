@@ -161,6 +161,7 @@ for account in all_accounts:
             y=df[df.account == account].total_iris,
             name=account,
             mode="markers",
+            marker=dict(size=5 + df[df.account == account].total_size / 2 ** 14)
         ),
         secondary_y=True,
     )
@@ -222,7 +223,7 @@ for account in all_accounts:
             y=df_hour[df_hour.account == account].total_iris,
             name=account,
             mode="markers",
-            marker=dict(size=10 + df_hour[df_hour.account == account].total_size / 512),
+            marker=dict(size=10 + df_hour[df_hour.account == account].total_size / 256),
         ),
         secondary_y=True,
     )
