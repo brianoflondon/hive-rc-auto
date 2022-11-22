@@ -249,3 +249,5 @@ fig2.update_xaxes(showspikes=True)
 fig2.update_yaxes(showspikes=True)
 st.title(f"Last {number_hours} hours of IRIs per minute by Accounts")
 st.plotly_chart(fig2, use_container_width=True)
+
+st.dataframe(df_hour.groupby('account')['total_iris'].describe())

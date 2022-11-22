@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 from pymongo import MongoClient
+from hive_rc_auto.helpers.markdown.static_text import import_text
+ALL_MARKDOWN = import_text()
 
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
@@ -201,8 +203,8 @@ def gauge(host: str):
 
 st.set_page_config(layout="wide")
 top_cols = st.columns(2)
-top_cols[0].markdown("# Podping Health")
-st.sidebar.markdown("# Podping Health")
+top_cols[0].markdown("# Pingslurp Health")
+st.sidebar.markdown(ALL_MARKDOWN['pingslurp_hosts'])
 
 ncol = 5
 top_cols[0].subheader("Total Iris sent in the last Hour")

@@ -20,7 +20,7 @@ The lower graph shows the last 4 hours of activity and shows IRIs per minute.
 - podping.ddd
 - podping.eee
 
-Other noteable accounts:
+Other notable accounts:
 
 Sends out Podpings for 3speak.tv:
 - podping.spk
