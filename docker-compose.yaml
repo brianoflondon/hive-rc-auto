@@ -13,6 +13,10 @@ services:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "python bot.py"
     restart: unless-stopped
+    networks:
+      - pingslurp_pingslurp
+      - hive-network
+
 
   rc_dash:
     container_name: rc_dash
@@ -22,14 +26,20 @@ services:
     env_file:
       - ".env"
     ports:
-      - 8501:8501
+      - "${LOCAL_TAILSCALE_IP}:8501:8501"
+      - "127.0.0.1:8501:8501"
+      - "127.0.1.1:8501:8501"
     # environment:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
-    command: bash -c "streamlit run main.py"
+    command: bash -c "streamlit run Podping.py"
     restart: unless-stopped
-
+    networks:
+      - pingslurp_pingslurp
+      - hive-network
 
 
 networks:
-  default:
-    name: v4vapi_default
+  pingslurp_pingslurp:
+    external: true
+  hive-network:
+    external: true

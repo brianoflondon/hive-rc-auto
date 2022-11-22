@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import pytest
+
 from hive_rc_auto.helpers.rc_delegation import (
     RCAllData,
     RCListOfAccounts,

@@ -15,9 +15,10 @@ logging.basicConfig(
     datefmt="%m-%dT%H:%M:%S",
 )
 
+
 class Config:
     try:
-        PRIMARY_ACCOUNT: str = os.getenv('PRIMARY_ACCOUNT')
+        PRIMARY_ACCOUNT: str = os.getenv("PRIMARY_ACCOUNT")
         DELEGATING_ACCOUNTS: List[str] = os.getenv("DELEGATING_ACCOUNTS").split(",")
 
         POSTING_KEY: str = os.getenv("HIVE_POSTING_KEY")
@@ -39,9 +40,16 @@ class Config:
         TESTNET_CHAINID: str = {"chain_id": os.getenv("TESTNET_CHAINID")}
 
         DB_CONNECTION = os.getenv("DB_CONNECTION")
+        DB_NAME = os.getenv("DB_NAME")
+        if TESTNET:
+            DB_NAME = "testnet_" + DB_NAME
+
+        DB_NAME_DELEG = DB_NAME + "_deleg"
+
         if not DB_CONNECTION:
             DB_CONNECTION = "mongodb://127.0.0.1:27017"
 
+        MINIMUM_DELEGATION=10_000_000_000
 
     except AttributeError as ex:
         logging.exception(ex)

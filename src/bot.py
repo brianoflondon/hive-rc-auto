@@ -8,7 +8,12 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pymongo.errors import DuplicateKeyError, ServerSelectionTimeoutError
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.rc_delegation import RCAccount, RCAllData, RCListOfAccounts
+from hive_rc_auto.helpers.rc_delegation import (
+    RCAccount,
+    RCAllData,
+    RCListOfAccounts,
+    setup_mongo_db,
+)
 
 
 async def update_rc_accounts():
@@ -44,6 +49,7 @@ async def check_db():
 async def main_loop():
     # Setup the data
     await check_db()
+    setup_mongo_db()
     tasks = [update_rc_accounts()]
     await asyncio.gather(*tasks)
 

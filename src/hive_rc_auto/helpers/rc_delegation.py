@@ -1,30 +1,74 @@
-
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, List, Tuple, Union
+
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
+from pydantic import BaseModel, Field
+from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
-    HiveTrx, get_client, get_delegated_posting_auth_accounts, get_rcs,
-    get_tracking_accounts, make_lighthive_call, send_custom_json)
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
-from pydantic import BaseModel, Field
+    HiveTrx,
+    get_client,
+    get_delegated_posting_auth_accounts,
+    get_rcs,
+    get_tracking_accounts,
+    make_lighthive_call,
+    send_custom_json,
+)
+
+DB_NAME = "rc_podping"
 
 
 def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
     """Returns the MongoDB"""
-    return AsyncIOMotorClient(Config.DB_CONNECTION)["podping"][collection]
+    return AsyncIOMotorClient(Config.DB_CONNECTION)[DB_NAME][collection]
+
+
+def setup_mongo_db() -> int:
+    """Check if the DB exists and set it up if needed. Returns number of new DBs"""
+    count = 0
+    for db_name in [Config.DB_NAME, Config.DB_NAME_DELEG]:
+        if check_setup_db(db_name):
+            count += 1
+    return count
+
+
+def check_setup_db(db_name: str) -> bool:
+    db = MongoClient(Config.DB_CONNECTION)[DB_NAME]
+    collection_names = db.list_collection_names()
+    if db_name in collection_names:
+        logging.info(f"DB: {db_name} found in DB: {collection_names}")
+        return False
+
+    if "deleg" in db_name.lower():
+        meta_field = "deleg"
+    else:
+        meta_field = "account"
+
+    # Create timeseries collection:
+    db.create_collection(
+        db_name,
+        timeseries={
+            "timeField": "timestamp",
+            "metaField": meta_field,
+            "granularity": "seconds",
+        },
+    )
+    logging.info(f"DB: {db_name} created in database")
+    return True
+
 
 def get_utc_now_timestamp() -> datetime:
     return datetime.now(timezone.utc)
+
 
 class RCStatus(str, Enum):
     OK = "ok"
     LOW = "low"
     HIGH = "high"
-
-
 
 
 class RCAccType(str, Enum):
@@ -33,11 +77,12 @@ class RCAccType(str, Enum):
 
 
 def mill(input: float) -> int:
-    """Divide by 1 million"""
+    """Divide by 1 million retuns int"""
     return round(input / 1e6)
 
 
 def mill_s(input: float) -> str:
+    """Divide by 1 million and return a string"""
     m = mill(input)
     return f"{m:>12,} M"
 
@@ -66,12 +111,13 @@ class RCDirectDelegation(BaseModel):
     def db_format(self, trx: HiveTrx) -> dict:
         ans = {}
         ans["timestamp"] = get_utc_now_timestamp()
+        ans["deleg"] = {"acc_from": self.acc_from, "acc_to": self.acc_to}
         ans["account"] = self.acc_to
         ans = ans | self.dict() | trx.dict()
         return ans
 
     @property
-    def payload_item(self) -> List[dict]:
+    def payload_item(self) -> List[str | dict[str, str | list[str] | int]]:
         return [
             "delegate_rc",
             {
@@ -91,6 +137,7 @@ class RCDirectDelegation(BaseModel):
             return "| Increasing ^"
 
     def log_line_output(self, logger: Callable):
+        """Send a formated line to the logger passed"""
         logger(
             f"{self.acc_from:<16} -> {self.acc_to} | "
             f"{mill(self.delegated_rc):>12,} M"
@@ -237,9 +284,11 @@ class RCAccount(BaseModel):
         if self.status == RCStatus.LOW:
             percent_gap = Config.RC_PCT_LOWER_TARGET - self.real_mana_percent
             new_amount = self.max_rc * (1 + ((percent_gap) / 100))
+            if new_amount < Config.MINIMUM_DELEGATION:
+                new_amount = 0
             return new_amount
         if self.status == RCStatus.HIGH and self.delta_percent > 0:
-            percent_gap = self.real_mana_percent - Config.RC_PCT_UPPER_TARGET
+            percent_gap = (self.real_mana_percent - Config.RC_PCT_UPPER_TARGET) + 2
             delta = -(self.max_rc * (((percent_gap) / 100))) * 1.3
             return delta
         return 0
@@ -432,10 +481,7 @@ class RCAllData(BaseModel):
                     )
                     if trx:
                         logging.info(f"Custom Json: {trx.trx_num}")
-                        db_name = (
-                            "rc_history_testnet" if Config.TESTNET else "rc_history"
-                        )
-                        db_delegations = get_mongo_db(db_name)
+                        db_delegations = get_mongo_db(Config.DB_NAME_DELEG)
                         await db_delegations.insert_many(
                             [pd.db_format(trx=trx) for pd in self.pending_delegations]
                         )
@@ -504,7 +550,7 @@ class RCAllData(BaseModel):
 
     async def which_account_to_cut_delegation_from(
         self, target: str, amount: int
-    ) -> Tuple[str, int]:
+    ) -> Union[Tuple[str, int],None]:
         """Which delegating account can we reduce delegation from to drop delegation
         by the target amount"""
         rc = self._get_rcs(target)
@@ -524,10 +570,16 @@ class RCAllData(BaseModel):
 
     async def store_all_data(self):
         """Store all this item's relevant data in a MongoDB"""
-        db_name = "rc_history_testnet" if Config.TESTNET else "rc_history"
-        db_rc_history = get_mongo_db(db_name)
+        db_rc_history = get_mongo_db(Config.DB_NAME)
         data = [rc.db_format for rc in self.rcs]
-        ans = await db_rc_history.insert_many(data)
+        try:
+            ans = await db_rc_history.insert_many(data)
+        except ServerSelectionTimeoutError as ex:
+            logging.error("Can't reach Database")
+            logging.error(ex)
+        except Exception as ex:
+            logging.error("problem writing to Database")
+            logging.error(ex)
 
 
 async def get_rc_of_accounts(

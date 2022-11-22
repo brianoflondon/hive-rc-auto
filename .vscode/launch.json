@@ -28,7 +28,7 @@
             "cwd": "${workspaceFolder}/src/",
             "args": [
                 "run",
-                "main.py"
+                "Podping.py"
             ],
             "justMyCode": true
         }
