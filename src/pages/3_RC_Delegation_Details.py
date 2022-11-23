@@ -6,6 +6,8 @@ import streamlit as st
 st.markdown("# RC Delegation Details")
 st.sidebar.markdown("# Details")
 
+
+
 try:
     df = st.session_state.df_rc_changes
     df.sort_values(by="age", ascending=True, inplace=True)

@@ -162,7 +162,7 @@ def hours_selectbox():
     hours_selectbox_options = [4, 8, 24, 72, "All"]
     cols = st.columns(3)
     cols[0].subheader("RC Levels")
-    st.session_state.hours = cols[1].selectbox(
+    st.session_state.hours = st.sidebar.selectbox(
         label="Hours",
         options=hours_selectbox_options,
         index=2,
@@ -227,7 +227,6 @@ async def main_loop():
     logging.info(f"Running at {datetime.now()}")
     if "hours" not in st.session_state:
         st.session_state.hours = 24
-    hours_selectbox()
     await grid(ncol=3)
     st.markdown(ALL_MARKDOWN["rc_overview"])
 
@@ -251,7 +250,7 @@ if __name__ == "__main__":
         layout="wide",
         initial_sidebar_state="expanded",
     )
-    st.sidebar.markdown("# RC Overview 📈")
+    hours_selectbox()
     st.sidebar.markdown(ALL_MARKDOWN["rc_overview"])
     # try:
     asyncio.run(main_loop())
