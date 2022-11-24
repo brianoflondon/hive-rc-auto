@@ -151,8 +151,8 @@ def hour_trans_no_account(time_limit: datetime, time_frame: str):
 metrics = {
     "Total IRIs": "total_iris",
     "Total Podpings": "total_podpings",
-    "Total Size (Mb)": "total_size_mb",
-    "Average Size (Kb)": "avg_size",
+    "Total Size (Kb)": "total_size_kb",
+    "Average Size (b)": "avg_size",
 }
 
 
@@ -196,11 +196,11 @@ if df.empty:
 
 else:
     df.set_index("timestamp", inplace=True)
-    df["total_size_mb"] = df["total_size"] / (1024 * 1024)
+    df["total_size_kb"] = df["total_size"] / (1024 * 1)
 
     df_no_account = pd.DataFrame(all_trans_no_account())
     df_no_account.set_index("timestamp", inplace=True)
-    df_no_account["total_size_mb"] = df_no_account["total_size"] / (1024 * 1024)
+    df_no_account["total_size_kb"] = df_no_account["total_size"] / (1024 * 1)
 
     all_accounts = df.account.unique()
     all_accounts.sort()
@@ -211,13 +211,23 @@ else:
                 x=df[df.account == account].index,
                 y=df[df.account == account][metric],
                 name=account,
+                text=df[df.account == account]["account"],
                 mode="markers",
                 marker=dict(size=5 + df[df.account == account].total_size / 2 ** 14),
+                hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
             ),
             secondary_y=True,
         )
+
+    fig.update_layout(hoverlabel=dict(font_size=12, font_family="Rockwell"))
     fig.add_trace(
-        go.Scatter(x=df_no_account.index, y=df_no_account[metric], name=metric_desc)
+        go.Scatter(
+            x=df_no_account.index,
+            y=df_no_account[metric],
+            name=metric_desc,
+            text=[f"{metric_desc}" for _ in df_no_account.index],
+            hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
+        )
     )
 
     fig.add_trace(
@@ -225,6 +235,8 @@ else:
             x=df_no_account.index,
             y=df_no_account[metric].rolling(24).mean(),
             name=f"{metric_desc} (24H avg)",
+            text=[f"{metric_desc} (24H avg)" for _ in df_no_account.index],
+            hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
         )
     )
 
@@ -266,13 +278,11 @@ if df_hour.empty:
 
 else:
     df_hour.set_index("timestamp", inplace=True)
-    df_hour["total_size_mb"] = df_hour["total_size"] / (1024 * 1024)
+    df_hour["total_size_kb"] = df_hour["total_size"] / (1024 * 1)
 
     df_hour_no_account = pd.DataFrame(hour_trans_no_account(time_limit, time_frame))
     df_hour_no_account.set_index("timestamp", inplace=True)
-    df_hour_no_account["total_size_mb"] = df_hour_no_account["total_size"] / (
-        1024 * 1024
-    )
+    df_hour_no_account["total_size_kb"] = df_hour_no_account["total_size"] / (1024 * 1)
 
     all_accounts = df_hour.account.unique()
     all_accounts.sort()
@@ -287,12 +297,18 @@ else:
                 marker=dict(
                     size=10 + df_hour[df_hour.account == account].total_size / 256
                 ),
+                text=df_hour[df_hour.account == account]["account"],
+                hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
             ),
             secondary_y=True,
         )
     fig2.add_trace(
         go.Scatter(
-            x=df_hour_no_account.index, y=df_hour_no_account[metric], name=metric_desc
+            x=df_hour_no_account.index,
+            y=df_hour_no_account[metric],
+            name=metric_desc,
+            text=[f"{metric_desc}" for _ in df_no_account.index],
+            hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
         )
     )
     fig2.add_trace(
@@ -300,6 +316,8 @@ else:
             x=df_hour_no_account.index,
             y=df_hour_no_account[metric].rolling("1H").mean(),
             name=f"{metric_desc} (1hr Avg)",
+            text=[f"{metric_desc} (1hr Avg)" for _ in df_no_account.index],
+            hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
         )
     )
 
