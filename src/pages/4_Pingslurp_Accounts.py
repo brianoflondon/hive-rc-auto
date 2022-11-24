@@ -25,6 +25,7 @@ livetest_filter = livetest_only
 def all_trans_by_account():
     result = CLIENT["pingslurp"]["meta_ts"].aggregate(
         [
+            st.session_state.time_range,
             st.session_state.livetest_filter,
             {
                 "$group": {
@@ -55,6 +56,7 @@ def all_trans_by_account():
 def all_trans_no_account():
     result_no_account = CLIENT["pingslurp"]["meta_ts"].aggregate(
         [
+            st.session_state.time_range,
             st.session_state.livetest_filter,
             {
                 "$group": {
@@ -162,6 +164,11 @@ livetest_filter = {
     "Only Live Tests": {"$match": {"metadata.id": re.compile(r"pplt_.*")}},
 }
 
+time_range = {
+    "30 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=30)}}},
+    "60 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=60)}}},
+    "90 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=90)}}},
+}
 
 st.set_page_config(layout="wide")
 st.session_state.metric = st.sidebar.selectbox(
@@ -178,6 +185,12 @@ st.session_state.livetest_choice = st.sidebar.selectbox(
 )
 
 st.session_state.livetest_filter = livetest_filter[st.session_state.livetest_choice]
+
+st.session_state.time_range_choice = st.sidebar.selectbox(
+    label="Time Range",
+    options=time_range.keys()
+)
+st.session_state.time_range =time_range[st.session_state.time_range_choice]
 
 st.sidebar.markdown(ALL_MARKDOWN["pingslurp_accounts"])
 choice = st.session_state.metric
@@ -232,8 +245,8 @@ else:
 
     fig.add_trace(
         go.Scatter(
-            x=df_no_account.index,
-            y=df_no_account[metric].rolling(24).mean(),
+            x=df_no_account.index[::-1],
+            y=df_no_account[metric][::-1].rolling(24).mean(),
             name=f"{metric_desc} (24H avg)",
             text=[f"{metric_desc} (24H avg)" for _ in df_no_account.index],
             hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
