@@ -1,6 +1,8 @@
+import logging
 import os
 import re
 from datetime import datetime, timedelta
+from timeit import default_timer as timer
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -20,7 +22,7 @@ exclude_livetest = {"$match": {"metadata.id": re.compile(r"pp_.*")}}
 livetest_only = {"$match": {"metadata.id": re.compile(r"pply_.*")}}
 include_livetest = {}
 livetest_filter = livetest_only
-
+start = timer()
 
 def all_trans_by_account():
     result = CLIENT["pingslurp"]["meta_ts"].aggregate(
@@ -169,7 +171,7 @@ time_range = {
     "60 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=60)}}},
     "90 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=90)}}},
 }
-
+logging.info(f"Loading pingslurp_accounts")
 st.set_page_config(layout="wide")
 st.session_state.metric = st.sidebar.selectbox(
     label="Metric", options=metrics.keys(), help="Metric to show"
@@ -218,6 +220,7 @@ else:
     all_accounts = df.account.unique()
     all_accounts.sort()
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    logging.info(f"Data loaded for fig 1: {timer() - start}")
     for account in all_accounts:
         fig.add_trace(
             go.Scatter(
@@ -299,6 +302,7 @@ else:
 
     all_accounts = df_hour.account.unique()
     all_accounts.sort()
+    logging.info(f"Data loaded for fig 2: {timer() - start}")
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
     for account in all_accounts:
         fig2.add_trace(
@@ -355,3 +359,4 @@ else:
     st.plotly_chart(fig2, use_container_width=True)
 
     st.dataframe(df_hour.groupby("account")[metric].describe())
+    logging.info(f"Everything done: {timer() - start}")
