@@ -172,7 +172,8 @@ time_range = {
     "90 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=90)}}},
 }
 logging.info(f"Loading pingslurp_accounts")
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Podpings by Accounts", page_icon="android-chrome-512x512.png", layout="wide", initial_sidebar_state="auto", menu_items=None)
+
 st.session_state.metric = st.sidebar.selectbox(
     label="Metric", options=metrics.keys(), help="Metric to show"
 )
@@ -217,8 +218,8 @@ else:
     df_no_account.set_index("timestamp", inplace=True)
     df_no_account["total_size_kb"] = df_no_account["total_size"] / (1024 * 1)
 
-    all_accounts = df.account.unique()
-    all_accounts.sort()
+    all_accounts_desc = df.groupby('account')[metric].describe().sort_values(by='mean', ascending=False)
+    all_accounts = all_accounts_desc.index
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     logging.info(f"Data loaded for fig 1: {timer() - start}")
     for account in all_accounts:
@@ -273,7 +274,7 @@ else:
     fig.update_yaxes(showline=False, gridwidth=0.1)
     fig.update_yaxes(gridwidth=0.1, secondary_y=True)
 
-    fig.update_layout(title_x=0.05, title_y=0.95)
+    fig.update_layout(title_x=0.05, title_y=0.9)
     fig.update_layout(title_text=f"{metric_desc} Sent per Hour by each account")
 
     end_range = datetime.utcnow() + timedelta(hours=0.5)
@@ -281,6 +282,7 @@ else:
     fig.update_layout(xaxis=dict(range=[start_range, end_range]))
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 number_hours = 4
 
@@ -300,8 +302,8 @@ else:
     df_hour_no_account.set_index("timestamp", inplace=True)
     df_hour_no_account["total_size_kb"] = df_hour_no_account["total_size"] / (1024 * 1)
 
-    all_accounts = df_hour.account.unique()
-    all_accounts.sort()
+    all_accounts_desc_hour = df_hour.groupby('account')[metric].describe().sort_values(by='mean', ascending=False)
+    all_accounts = all_accounts_desc_hour.index
     logging.info(f"Data loaded for fig 2: {timer() - start}")
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
     for account in all_accounts:
@@ -344,7 +346,7 @@ else:
     fig2.update_layout(margin={"autoexpand": True, "b": 25, "t": 25, "l": 5, "r": 5})
 
     fig2.update_yaxes(title_text=metric_desc, secondary_y=False, showgrid=False)
-    fig2.update_layout(title_x=0.05, title_y=0.95)
+    fig2.update_layout(title_x=0.05, title_y=0.9)
 
     fig2.update_yaxes(
         title_text=f"{metric_desc} by account", secondary_y=True, showgrid=False
@@ -358,5 +360,9 @@ else:
 
     st.plotly_chart(fig2, use_container_width=True)
 
-    st.dataframe(df_hour.groupby("account")[metric].describe())
+    cols = st.columns(2)
+    cols[0].subheader(body=f"{metric_desc} Sent per Hour by each account")
+    cols[0].dataframe(all_accounts_desc)
+    cols[1].subheader(f"Last {number_hours} hours of {metric_desc} per minute by Accounts")
+    cols[1].dataframe(all_accounts_desc_hour)
     logging.info(f"Everything done: {timer() - start}")
