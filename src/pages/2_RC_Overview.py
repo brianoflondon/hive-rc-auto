@@ -136,26 +136,27 @@ async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
         data.append(doc)
 
     df = pd.DataFrame(data)
-    df["age"] = datetime.utcnow() - df.timestamp
-    df.set_index("timestamp", inplace=True)
-    df["age_hours"] = df["age"].dt.total_seconds() / 3600
+    if not df.empty:
+        df["age"] = datetime.utcnow() - df.timestamp
+        df.set_index("timestamp", inplace=True)
+        df["age_hours"] = df["age"].dt.total_seconds() / 3600
 
-    db_rc_ts_deleg = get_mongo_db(Config.DB_NAME_DELEG)
-    cursor = db_rc_ts_deleg.find({"timestamp": {"$gte": earliest_data}}, {"_id": 0})
-    data = []
-    async for doc in cursor:
-        data.append(doc)
+        db_rc_ts_deleg = get_mongo_db(Config.DB_NAME_DELEG)
+        cursor = db_rc_ts_deleg.find({"timestamp": {"$gte": earliest_data}}, {"_id": 0})
+        data = []
+        async for doc in cursor:
+            data.append(doc)
 
-    df_rc_changes = pd.DataFrame(data)
-    if data:
-        df_rc_changes["age"] = datetime.utcnow() - df_rc_changes.timestamp
-        df_rc_changes.set_index("timestamp", inplace=True)
-        df_rc_changes["age_hours"] = df_rc_changes["age"].dt.total_seconds() / 3600
+        df_rc_changes = pd.DataFrame(data)
+        if data:
+            df_rc_changes["age"] = datetime.utcnow() - df_rc_changes.timestamp
+            df_rc_changes.set_index("timestamp", inplace=True)
+            df_rc_changes["age_hours"] = df_rc_changes["age"].dt.total_seconds() / 3600
 
-    st.session_state.df = df
-    st.session_state.df_rc_changes = df_rc_changes
+        st.session_state.df = df
+        st.session_state.df_rc_changes = df_rc_changes
 
-    return df, df_rc_changes
+        return df, df_rc_changes
 
 
 def hours_selectbox():
