@@ -180,6 +180,7 @@ st.session_state.metric = st.sidebar.selectbox(
 st.session_state.livetest_choice = st.sidebar.selectbox(
     label="Live Tests",
     options=livetest_filter.keys(),
+    index=1,
     help=(
         "Show/Hide Live Tests. "
         "Some fake podpings are sent out during testing, "
