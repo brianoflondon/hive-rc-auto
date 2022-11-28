@@ -61,13 +61,12 @@ def build_rc_graph(
     # dfa.resample('10T').mean(numeric_only=True)
     # logging.info(f"Resample {hive_acc} - {timer()-start:.2f}s")
     fig = make_subplots(specs=[[{"secondary_y": True}]])
-    dfa["text"] = [f"{ts:%d %H:%M}" for ts in dfa.index]
     fig.add_trace(
         go.Scatter(
             x=dfa.age_hours,
             y=dfa["real_mana_percent"],
             name="RC %",
-            text=dfa["text"],
+            text=[f"{ts:%d %H:%M}" for ts in dfa.index],
             hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.1f}%",
         ),
         secondary_y=True,
@@ -77,7 +76,7 @@ def build_rc_graph(
             x=dfa.age_hours,
             y=dfa["real_mana"],
             name="RC",
-            text=dfa["text"],
+            text=[f"{ts:%d %H:%M}" for ts in dfa.index],
             hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.3s}",
         ),
         secondary_y=False,

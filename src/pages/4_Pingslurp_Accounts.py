@@ -4,6 +4,7 @@ import re
 from datetime import datetime, timedelta
 from timeit import default_timer as timer
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -307,6 +308,7 @@ else:
     all_accounts = all_accounts_desc_hour.index
     logging.info(f"Data loaded for fig 2: {timer() - start}")
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
+    df_hour['marker_size'] = np.log10(df_hour['total_size'])
     for account in all_accounts:
         fig2.add_trace(
             go.Scatter(
@@ -315,7 +317,7 @@ else:
                 name=account,
                 mode="markers",
                 marker=dict(
-                    size=10 + df_hour[df_hour.account == account].total_size / 256
+                    size=10 + df_hour[df_hour.account == account]['marker_size']
                 ),
                 text=df_hour[df_hour.account == account]["account"],
                 hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
