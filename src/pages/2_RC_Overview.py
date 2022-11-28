@@ -259,7 +259,7 @@ if __name__ == "__main__":
     logging.info("----------------------------------------")
     st.set_page_config(
         page_title="RC Delegation - Auto",
-        page_icon="🧊",
+        page_icon="pages/android-chrome-512x512.png",
         layout="wide",
         initial_sidebar_state="expanded",
     )

@@ -201,7 +201,14 @@ def gauge(host: str):
     return fig
 
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title="Pingslurp Hosts",
+    page_icon="pages/android-chrome-512x512.png",
+    layout="wide",
+    initial_sidebar_state="auto",
+    menu_items=None,
+)
+
 top_cols = st.columns(2)
 top_cols[0].markdown("# Pingslurp Health")
 st.sidebar.markdown(ALL_MARKDOWN['pingslurp_hosts'])

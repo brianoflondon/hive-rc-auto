@@ -25,6 +25,7 @@ include_livetest = {}
 livetest_filter = livetest_only
 start = timer()
 
+
 def all_trans_by_account():
     result = CLIENT["pingslurp"]["meta_ts"].aggregate(
         [
@@ -168,12 +169,27 @@ livetest_filter = {
 }
 
 time_range = {
-    "30 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=30)}}},
-    "60 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=60)}}},
-    "90 Days": {"$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=90)}}},
+    "10 Days": {
+        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=10)}}
+    },
+    "30 Days": {
+        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=30)}}
+    },
+    "60 Days": {
+        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=60)}}
+    },
+    "90 Days": {
+        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=90)}}
+    },
 }
 logging.info(f"Loading pingslurp_accounts")
-st.set_page_config(page_title="Podpings by Accounts", page_icon="android-chrome-512x512.png", layout="wide", initial_sidebar_state="auto", menu_items=None)
+st.set_page_config(
+    page_title="Podpings by Accounts",
+    page_icon="pages/android-chrome-512x512.png",
+    layout="wide",
+    initial_sidebar_state="auto",
+    menu_items=None,
+)
 
 st.session_state.metric = st.sidebar.selectbox(
     label="Metric", options=metrics.keys(), help="Metric to show"
@@ -192,10 +208,9 @@ st.session_state.livetest_choice = st.sidebar.selectbox(
 st.session_state.livetest_filter = livetest_filter[st.session_state.livetest_choice]
 
 st.session_state.time_range_choice = st.sidebar.selectbox(
-    label="Time Range",
-    options=time_range.keys()
+    label="Time Range", options=time_range.keys()
 )
-st.session_state.time_range =time_range[st.session_state.time_range_choice]
+st.session_state.time_range = time_range[st.session_state.time_range_choice]
 
 st.sidebar.markdown(ALL_MARKDOWN["pingslurp_accounts"])
 choice = st.session_state.metric
@@ -220,11 +235,14 @@ else:
     df_no_account.set_index("timestamp", inplace=True)
     df_no_account["total_size_kb"] = df_no_account["total_size"] / (1024 * 1)
 
-    all_accounts_desc = df.groupby('account')[metric].describe().sort_values(by='mean', ascending=False)
+    all_accounts_desc = (
+        df.groupby("account")[metric].describe().sort_values(by="mean", ascending=False)
+    )
     all_accounts = all_accounts_desc.index
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     logging.info(f"Data loaded for fig 1: {timer() - start}")
     for account in all_accounts:
+        g_start = timer()
         fig.add_trace(
             go.Scatter(
                 x=df[df.account == account].index,
@@ -237,7 +255,7 @@ else:
             ),
             secondary_y=True,
         )
-
+        logging.info(f"Graph for {account}: {timer() - g_start}")
     fig.update_layout(hoverlabel=dict(font_size=12, font_family="Rockwell"))
     fig.add_trace(
         go.Scatter(
@@ -280,7 +298,7 @@ else:
     fig.update_layout(title_text=f"{metric_desc} Sent per Hour by each account")
 
     end_range = datetime.utcnow() + timedelta(hours=0.5)
-    start_range = end_range - timedelta(days=30)
+    start_range = end_range - timedelta(days=int(st.session_state.time_range_choice.split()[0]))
     fig.update_layout(xaxis=dict(range=[start_range, end_range]))
 
     st.plotly_chart(fig, use_container_width=True)
@@ -304,12 +322,17 @@ else:
     df_hour_no_account.set_index("timestamp", inplace=True)
     df_hour_no_account["total_size_kb"] = df_hour_no_account["total_size"] / (1024 * 1)
 
-    all_accounts_desc_hour = df_hour.groupby('account')[metric].describe().sort_values(by='mean', ascending=False)
+    all_accounts_desc_hour = (
+        df_hour.groupby("account")[metric]
+        .describe()
+        .sort_values(by="mean", ascending=False)
+    )
     all_accounts = all_accounts_desc_hour.index
     logging.info(f"Data loaded for fig 2: {timer() - start}")
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
-    df_hour['marker_size'] = np.log10(df_hour['total_size'])
+    df_hour["marker_size"] = np.log10(df_hour["total_size"])
     for account in all_accounts:
+        g_start = timer()
         fig2.add_trace(
             go.Scatter(
                 x=df_hour[df_hour.account == account].index,
@@ -317,13 +340,14 @@ else:
                 name=account,
                 mode="markers",
                 marker=dict(
-                    size=10 + df_hour[df_hour.account == account]['marker_size']
+                    size=10 + df_hour[df_hour.account == account]["marker_size"]
                 ),
                 text=df_hour[df_hour.account == account]["account"],
                 hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
             ),
             secondary_y=True,
         )
+        logging.info(f"Graph for {account}: {timer() - g_start}")
     fig2.add_trace(
         go.Scatter(
             x=df_hour_no_account.index,
@@ -366,6 +390,8 @@ else:
     cols = st.columns(2)
     cols[0].subheader(body=f"{metric_desc} Sent per Hour by each account")
     cols[0].dataframe(all_accounts_desc)
-    cols[1].subheader(f"Last {number_hours} hours of {metric_desc} per minute by Accounts")
+    cols[1].subheader(
+        f"Last {number_hours} hours of {metric_desc} per minute by Accounts"
+    )
     cols[1].dataframe(all_accounts_desc_hour)
     logging.info(f"Everything done: {timer() - start}")
