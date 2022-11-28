@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.11
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \
@@ -16,7 +16,5 @@ RUN poetry install --no-root --only main
 COPY ./src /app/
 
 # EXPOSE 8505
-
-
 # ENTRYPOINT ["hive_rc_auto/bot.py"]
 # ENTRYPOINT ["streamlit", "run", "hive_rc_auto/main.py", "--server.port=8505", "--server.address=0.0.0.0"]
