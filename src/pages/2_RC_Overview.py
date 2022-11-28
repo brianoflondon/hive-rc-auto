@@ -267,6 +267,23 @@ if __name__ == "__main__":
     st.sidebar.markdown(ALL_MARKDOWN["rc_overview"])
     # try:
     asyncio.run(main_loop())
+    try:
+        df = st.session_state.df_rc_changes
+        df.sort_values(by="age", ascending=True, inplace=True)
+        if not df.empty:
+            df["link"] = f"[Link](https://hive.ausbit.dev/tx/" + df["trx_id"] + ")"
+            df = df.drop(
+                ["deleg", "age", "trx_num", "trx_id", "block_num", "account"], axis=1
+            )
+            mkd = df.to_markdown()
+            st.markdown(mkd)
+            st.dataframe(df, use_container_width=True)
+
+
+    except AttributeError:
+        pass
+    except Exception as e:
+        logging.error(e)
     # except KeyboardInterrupt:
     #     logging.info("Terminated with Ctrl-C")
     # except asyncio.CancelledError:
