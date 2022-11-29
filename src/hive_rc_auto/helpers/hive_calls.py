@@ -1,13 +1,13 @@
 import json
 import logging
 import os
-from random import shuffle
 import re
+from random import shuffle
 from typing import Any, Callable, List, Optional, Union
 
 import backoff
+import httpx
 import pymssql
-from hive_rc_auto.helpers.config import Config
 from lighthive.client import Client
 from lighthive.datastructures import Operation
 from lighthive.exceptions import RPCNodeException
@@ -15,11 +15,13 @@ from lighthive.helpers.account import VOTING_MANA_REGENERATION_IN_SECONDS
 from lighthive.node_picker import compare_nodes
 from pydantic import BaseModel, Field
 
+from hive_rc_auto.helpers.config import Config
+
 Config.VOTING_MANA_REGENERATION_IN_SECONDS = VOTING_MANA_REGENERATION_IN_SECONDS
 
 
 class HiveTrx(BaseModel):
-    trx_id: str = Field(alias = "id")
+    trx_id: str = Field(alias="id")
     block_num: int
     trx_num: int
     expired: bool
@@ -156,6 +158,30 @@ def get_rcs(check_accounts: List[str]) -> dict:
     )
 
 
+async def publish_feed() -> bool:
+    """Publishes a price feed to Hive"""
+    try:
+        resp = httpx.get("https://api.v4v.app/v1/cryptoprices/?use_cache=true")
+        if resp.status_code == 200:
+            rjson = resp.json()
+            base = rjson['v4vapp']['Hive_HBD']
+            client = get_client(posting_keys=[Config.WITNESS_ACTIVE_KEY])
+            op = Operation(
+                "feed_publish",
+                {
+                    "publisher": "brianoflondon",
+                    "exchange_rate": {"base": f"{base:.3f} HBD", "quote": "1.000 HIVE"},
+                },
+            )
+            trx = client.broadcast_sync(op=op, dry_run=False)
+            logging.info(f"Price feed published: {trx}")
+            return True
+    except Exception as ex:
+        logging.exception(ex)
+        logging.error(f"Exception publishing price feed: {ex}")
+        return False
+
+
 def make_lighthive_call(client: Client, call_to_make: Callable, params: Any = None):
     counter = len(client.node_list)
     while counter > 0:
@@ -179,7 +205,7 @@ async def construct_operation(
     required_auth: str = None,
     required_posting_auth: str = None,
 ) -> Operation:
-    """Builed the operation for the blockchain"""
+    """Build the operation for the blockchain"""
     payload_json = json.dumps(payload, separators=(",", ":"), default=str)
     if required_auth == None:
         required_auths = []

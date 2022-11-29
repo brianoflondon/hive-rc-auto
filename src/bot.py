@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from pymongo.errors import DuplicateKeyError, ServerSelectionTimeoutError
 
 from hive_rc_auto.helpers.config import Config
+from hive_rc_auto.helpers.hive_calls import publish_feed
 from hive_rc_auto.helpers.rc_delegation import (
     RCAccount,
     RCAllData,
@@ -33,6 +34,17 @@ async def update_rc_accounts():
         await asyncio.sleep(Config.UPDATE_FREQUENCY_SECS)
 
 
+async def keep_publishing_price_feed():
+    """
+    Publishes a price feed for my witness, this will move to its own project soon
+    """
+    while True:
+        success = await publish_feed()
+        if success:
+            await asyncio.sleep(60*600)
+        else:
+            await asyncio.sleep(Config.UPDATE_FREQUENCY_SECS)
+
 async def check_db():
     logging.info(Config.DB_CONNECTION)
     try:
@@ -50,7 +62,7 @@ async def main_loop():
     # Setup the data
     await check_db()
     setup_mongo_db()
-    tasks = [update_rc_accounts()]
+    tasks = [update_rc_accounts(), keep_publishing_price_feed()]
     await asyncio.gather(*tasks)
 
 

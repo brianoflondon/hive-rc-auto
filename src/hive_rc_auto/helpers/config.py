@@ -22,6 +22,7 @@ class Config:
         DELEGATING_ACCOUNTS: List[str] = os.getenv("DELEGATING_ACCOUNTS").split(",")
 
         POSTING_KEY: str = os.getenv("HIVE_POSTING_KEY")
+        WITNESS_ACTIVE_KEY: str = os.getenv("WITNESS_ACTIVE_KEY")
         UPDATE_FREQUENCY_SECS: int = int(
             os.getenv("UPDATE_FREQUENCY_SECS")
         )  # in Minutes
