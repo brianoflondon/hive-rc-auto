@@ -211,6 +211,7 @@ st.session_state.time_range_choice = st.sidebar.selectbox(
     label="Time Range", options=time_range.keys()
 )
 st.session_state.time_range = time_range[st.session_state.time_range_choice]
+st.session_state.time_range_days = int(st.session_state.time_range_choice.split()[0])
 
 st.sidebar.markdown(ALL_MARKDOWN["pingslurp_accounts"])
 choice = st.session_state.metric
@@ -277,6 +278,17 @@ else:
         )
     )
 
+    if st.session_state.time_range_days >29:
+        fig.add_trace(
+            go.Scatter(
+                x=df_no_account.index[::-1],
+                y=df_no_account[metric][::-1].rolling('7D').mean(),
+                name=f"{metric_desc} (7 day avg)",
+                text=[f"{metric_desc} (7 day avg)" for _ in df_no_account.index],
+                hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
+            )
+        )
+
     # fig.update_layout(
     #     legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="right", x=0.9)
     # )
@@ -298,7 +310,7 @@ else:
     fig.update_layout(title_text=f"{metric_desc} Sent per Hour by each account")
 
     end_range = datetime.utcnow() + timedelta(hours=0.5)
-    start_range = end_range - timedelta(days=int(st.session_state.time_range_choice.split()[0]))
+    start_range = end_range - timedelta(days=st.session_state.time_range_days)
     fig.update_layout(xaxis=dict(range=[start_range, end_range]))
 
     st.plotly_chart(fig, use_container_width=True)
