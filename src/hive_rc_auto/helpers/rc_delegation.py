@@ -439,18 +439,20 @@ class RCAllData(BaseModel):
                     ) = await self.which_account_to_cut_delegation_from(
                         deleg[0], amount=deleg[1]
                     )
-                    new_dd = RCDirectDelegation.parse_obj(
-                        {
-                            "from": cut_delegate_from,
-                            "to": deleg[0],
-                            "delegated_rc": new_amount,
-                            "cut": True,
-                        }
-                    )
-                    self.pending_delegations.append(new_dd)
-                    logging.debug(
-                        f"Cut Deleg from {cut_delegate_from} {deleg[0]} {deleg[1]}"
-                    )
+                    if not cut_delegate_from == "external_delegation":
+                        # This account has a delegation we can coontrol Podping
+                        new_dd = RCDirectDelegation.parse_obj(
+                            {
+                                "from": cut_delegate_from,
+                                "to": deleg[0],
+                                "delegated_rc": new_amount,
+                                "cut": True,
+                            }
+                        )
+                        self.pending_delegations.append(new_dd)
+                        logging.debug(
+                            f"Cut Deleg from {cut_delegate_from} {deleg[0]} {deleg[1]}"
+                        )
 
     async def get_payload_for_pending_delegations(
         self, send_json: bool = False
@@ -555,6 +557,8 @@ class RCAllData(BaseModel):
         by the target amount"""
         rc = self._get_rcs(target)
         dd_list = self._get_inbound_delegations(target)
+        if not dd_list:
+            return "external_delegation", 0
         logging.info(f"Account: {target:>16} remove {mill_s(amount)}")
         [dd.log_line_output(logging.debug) for dd in dd_list]
         for delegator in reversed(self.accounts.delegating):
@@ -567,6 +571,7 @@ class RCAllData(BaseModel):
                     f"= {mill_s(new_delegation)}"
                 )
                 return delegator, new_delegation
+        return "external_delegation", 0
 
     async def store_all_data(self):
         """Store all this item's relevant data in a MongoDB"""

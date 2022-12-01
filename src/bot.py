@@ -62,7 +62,7 @@ async def main_loop():
     # Setup the data
     await check_db()
     setup_mongo_db()
-    tasks = [update_rc_accounts(), keep_publishing_price_feed()]
+    tasks = [update_rc_accounts()] #, keep_publishing_price_feed()]
     await asyncio.gather(*tasks)
 
 
