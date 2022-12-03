@@ -182,6 +182,9 @@ time_range = {
         "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=90)}}
     },
 }
+
+display_all = {"Display All": True, "Only Summaries": False}
+
 logging.info(f"Loading pingslurp_accounts")
 st.set_page_config(
     page_title="Podpings by Accounts",
@@ -197,13 +200,23 @@ st.session_state.metric = st.sidebar.selectbox(
 st.session_state.livetest_choice = st.sidebar.selectbox(
     label="Live Tests",
     options=livetest_filter.keys(),
-    index=1,
+    index=0,
     help=(
         "Show/Hide Live Tests. "
         "Some fake podpings are sent out during testing, "
         "these are usually hidden but can be shown with this option."
     ),
 )
+
+st.session_state.display_all_choice = st.sidebar.selectbox(
+    label="Display All",
+    options=display_all.keys(),
+    index=0,
+    help=(
+        "Show details for every Hive Account sending podpings or just summary traces"
+    ),
+)
+st.session_state.display_all = display_all[st.session_state.display_all_choice]
 
 st.session_state.livetest_filter = livetest_filter[st.session_state.livetest_choice]
 
@@ -242,21 +255,22 @@ else:
     all_accounts = all_accounts_desc.index
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     logging.info(f"Data loaded for fig 1: {timer() - start}")
-    for account in all_accounts:
-        g_start = timer()
-        fig.add_trace(
-            go.Scatter(
-                x=df[df.account == account].index,
-                y=df[df.account == account][metric],
-                name=account,
-                text=df[df.account == account]["account"],
-                mode="markers",
-                marker=dict(size=5 + df[df.account == account].total_size / 2 ** 14),
-                hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
-            ),
-            secondary_y=True,
-        )
-        logging.info(f"Graph for {account}: {timer() - g_start}")
+    if st.session_state.display_all:
+        for account in all_accounts:
+            g_start = timer()
+            fig.add_trace(
+                go.Scatter(
+                    x=df[df.account == account].index,
+                    y=df[df.account == account][metric],
+                    name=account,
+                    text=df[df.account == account]["account"],
+                    mode="markers",
+                    marker=dict(size=5 + df[df.account == account].total_size / 2 ** 14),
+                    hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
+                ),
+                secondary_y=True,
+            )
+            logging.info(f"Graph for {account}: {timer() - g_start}")
     fig.update_layout(hoverlabel=dict(font_size=12, font_family="Rockwell"))
     fig.add_trace(
         go.Scatter(
@@ -278,11 +292,11 @@ else:
         )
     )
 
-    if st.session_state.time_range_days >29:
+    if st.session_state.time_range_days > 29:
         fig.add_trace(
             go.Scatter(
                 x=df_no_account.index[::-1],
-                y=df_no_account[metric][::-1].rolling('7D').mean(),
+                y=df_no_account[metric][::-1].rolling("7D").mean(),
                 name=f"{metric_desc} (7 day avg)",
                 text=[f"{metric_desc} (7 day avg)" for _ in df_no_account.index],
                 hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
@@ -343,23 +357,24 @@ else:
     logging.info(f"Data loaded for fig 2: {timer() - start}")
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
     df_hour["marker_size"] = np.log10(df_hour["total_size"])
-    for account in all_accounts:
-        g_start = timer()
-        fig2.add_trace(
-            go.Scatter(
-                x=df_hour[df_hour.account == account].index,
-                y=df_hour[df_hour.account == account][metric],
-                name=account,
-                mode="markers",
-                marker=dict(
-                    size=10 + df_hour[df_hour.account == account]["marker_size"]
+    if st.session_state.display_all:
+        for account in all_accounts:
+            g_start = timer()
+            fig2.add_trace(
+                go.Scatter(
+                    x=df_hour[df_hour.account == account].index,
+                    y=df_hour[df_hour.account == account][metric],
+                    name=account,
+                    mode="markers",
+                    marker=dict(
+                        size=10 + df_hour[df_hour.account == account]["marker_size"]
+                    ),
+                    text=df_hour[df_hour.account == account]["account"],
+                    hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
                 ),
-                text=df_hour[df_hour.account == account]["account"],
-                hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
-            ),
-            secondary_y=True,
-        )
-        logging.info(f"Graph for {account}: {timer() - g_start}")
+                secondary_y=True,
+            )
+            logging.info(f"Graph for {account}: {timer() - g_start}")
     fig2.add_trace(
         go.Scatter(
             x=df_hour_no_account.index,
