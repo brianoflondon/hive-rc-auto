@@ -12,6 +12,14 @@ from plotly.subplots import make_subplots
 from pymongo import MongoClient
 
 from hive_rc_auto.helpers.markdown.static_text import import_text
+from hive_rc_auto.helpers.pingslurp_accounts import (
+    all_trans_by_account,
+    all_trans_no_account,
+    dataframe_all_transactions_by_account,
+    dataframe_all_transactions_no_account,
+    hour_trans_by_account,
+    hour_trans_no_account,
+)
 
 ALL_MARKDOWN = import_text()
 
@@ -19,142 +27,10 @@ DB_CONNECTION = os.getenv("DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
 
 
-exclude_livetest = {"$match": {"metadata.id": re.compile(r"pp_.*")}}
-livetest_only = {"$match": {"metadata.id": re.compile(r"pply_.*")}}
-include_livetest = {}
-livetest_filter = livetest_only
 start = timer()
 
 
-def all_trans_by_account():
-    result = CLIENT["pingslurp"]["meta_ts"].aggregate(
-        [
-            st.session_state.time_range,
-            st.session_state.livetest_filter,
-            {
-                "$group": {
-                    "_id": {
-                        "account": "$metadata.posting_auth",
-                        "timestamp": {
-                            "$dateTrunc": {
-                                "date": "$timestamp",
-                                "unit": time_frame,
-                                "timezone": "Asia/Jerusalem",
-                            }
-                        },
-                    },
-                    "timestamp": {"$first": "$timestamp"},
-                    "account": {"$first": "$metadata.posting_auth"},
-                    "avg_size": {"$avg": "$json_size"},
-                    "total_size": {"$sum": "$json_size"},
-                    "total_podpings": {"$sum": 1},
-                    "total_iris": {"$sum": "$num_iris"},
-                }
-            },
-            {"$sort": {"_id.timestamp": -1}},
-        ]
-    )
-    return result
-
-
-def all_trans_no_account():
-    result_no_account = CLIENT["pingslurp"]["meta_ts"].aggregate(
-        [
-            st.session_state.time_range,
-            st.session_state.livetest_filter,
-            {
-                "$group": {
-                    "_id": {
-                        "timestamp": {
-                            "$dateTrunc": {
-                                "date": "$timestamp",
-                                "unit": time_frame,
-                                "timezone": "Asia/Jerusalem",
-                            }
-                        }
-                    },
-                    "timestamp": {"$first": "$timestamp"},
-                    "avg_size": {"$avg": "$json_size"},
-                    "total_size": {"$sum": "$json_size"},
-                    "total_podpings": {"$sum": 1},
-                    "total_iris": {"$sum": "$num_iris"},
-                }
-            },
-            {"$sort": {"_id.timestamp": -1}},
-        ]
-    )
-    return result_no_account
-
-
-def hour_trans_by_account(time_limit: datetime, time_frame: str):
-    result = CLIENT["pingslurp"]["meta_ts"].aggregate(
-        [
-            {
-                "$match": {
-                    "timestamp": {"$gt": time_limit},
-                }
-            },
-            st.session_state.livetest_filter,
-            {
-                "$group": {
-                    "_id": {
-                        "account": "$metadata.posting_auth",
-                        "timestamp": {
-                            "$dateTrunc": {
-                                "date": "$timestamp",
-                                "unit": time_frame,
-                                "timezone": "Asia/Jerusalem",
-                            }
-                        },
-                    },
-                    "timestamp": {"$first": "$timestamp"},
-                    "account": {"$first": "$metadata.posting_auth"},
-                    "avg_size": {"$avg": "$json_size"},
-                    "total_size": {"$sum": "$json_size"},
-                    "total_podpings": {"$sum": 1},
-                    "total_iris": {"$sum": "$num_iris"},
-                }
-            },
-            {"$sort": {"_id.timestamp": -1}},
-        ]
-    )
-    return result
-
-
-def hour_trans_no_account(time_limit: datetime, time_frame: str):
-    result = CLIENT["pingslurp"]["meta_ts"].aggregate(
-        [
-            {
-                "$match": {
-                    "timestamp": {"$gt": time_limit},
-                }
-            },
-            st.session_state.livetest_filter,
-            {
-                "$group": {
-                    "_id": {
-                        "timestamp": {
-                            "$dateTrunc": {
-                                "date": "$timestamp",
-                                "unit": time_frame,
-                                "timezone": "Asia/Jerusalem",
-                            }
-                        }
-                    },
-                    "timestamp": {"$first": "$timestamp"},
-                    "avg_size": {"$avg": "$json_size"},
-                    "total_size": {"$sum": "$json_size"},
-                    "total_podpings": {"$sum": 1},
-                    "total_iris": {"$sum": "$num_iris"},
-                }
-            },
-            {"$sort": {"_id.timestamp": -1}},
-        ]
-    )
-    return result
-
-
-metrics = {
+metrics_options = {
     "Total IRIs": "total_iris",
     "Total Podpings": "total_podpings",
     "Total Size (Kb)": "total_size_kb",
@@ -162,13 +38,13 @@ metrics = {
 }
 
 
-livetest_filter = {
+livetest_filter_options = {
     "Exclude Live Tests": {"$match": {"metadata.id": re.compile(r"pp_.*")}},
     "Include Live Tests": {"$match": {}},
     "Only Live Tests": {"$match": {"metadata.id": re.compile(r"pplt_.*")}},
 }
 
-time_range = {
+time_range_options = {
     "10 Days": {
         "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=10)}}
     },
@@ -183,7 +59,7 @@ time_range = {
     },
 }
 
-display_all = {"Display All": True, "Only Summaries": False}
+display_all_options = {"Display All": True, "Only Summaries": False}
 
 logging.info(f"Loading pingslurp_accounts")
 st.set_page_config(
@@ -195,11 +71,11 @@ st.set_page_config(
 )
 
 st.session_state.metric = st.sidebar.selectbox(
-    label="Metric", options=metrics.keys(), help="Metric to show"
+    label="Metric", options=metrics_options.keys(), help="Metric to show"
 )
 st.session_state.livetest_choice = st.sidebar.selectbox(
     label="Live Tests",
-    options=livetest_filter.keys(),
+    options=livetest_filter_options.keys(),
     index=0,
     help=(
         "Show/Hide Live Tests. "
@@ -210,44 +86,39 @@ st.session_state.livetest_choice = st.sidebar.selectbox(
 
 st.session_state.display_all_choice = st.sidebar.selectbox(
     label="Display All",
-    options=display_all.keys(),
+    options=display_all_options.keys(),
     index=0,
     help=(
         "Show details for every Hive Account sending podpings or just summary traces"
     ),
 )
-st.session_state.display_all = display_all[st.session_state.display_all_choice]
+st.session_state.display_all = display_all_options[st.session_state.display_all_choice]
 
-st.session_state.livetest_filter = livetest_filter[st.session_state.livetest_choice]
+st.session_state.livetest_filter = livetest_filter_options[
+    st.session_state.livetest_choice
+]
 
 st.session_state.time_range_choice = st.sidebar.selectbox(
-    label="Time Range", options=time_range.keys()
+    label="Time Range", options=time_range_options.keys()
 )
-st.session_state.time_range = time_range[st.session_state.time_range_choice]
+st.session_state.time_range = time_range_options[st.session_state.time_range_choice]
 st.session_state.time_range_days = int(st.session_state.time_range_choice.split()[0])
 
 st.sidebar.markdown(ALL_MARKDOWN["pingslurp_accounts"])
 choice = st.session_state.metric
 
-
-metric = metrics[choice]
+metric = metrics_options[choice]
 metric_desc = choice
 
 time_frame = "hour"
 
-result = all_trans_by_account()
-df = pd.DataFrame(result)
+df = dataframe_all_transactions_by_account()
 st.title(body=f"{metric_desc} Sent per Hour by each account")
 if df.empty:
     st.markdown(f"## No data")
 
 else:
-    df.set_index("timestamp", inplace=True)
-    df["total_size_kb"] = df["total_size"] / (1024 * 1)
-
-    df_no_account = pd.DataFrame(all_trans_no_account())
-    df_no_account.set_index("timestamp", inplace=True)
-    df_no_account["total_size_kb"] = df_no_account["total_size"] / (1024 * 1)
+    df_no_account = dataframe_all_transactions_no_account()
 
     all_accounts_desc = (
         df.groupby("account")[metric].describe().sort_values(by="mean", ascending=False)
@@ -265,7 +136,9 @@ else:
                     name=account,
                     text=df[df.account == account]["account"],
                     mode="markers",
-                    marker=dict(size=5 + df[df.account == account].total_size / 2 ** 14),
+                    marker=dict(
+                        size=5 + df[df.account == account].total_size / 2 ** 14
+                    ),
                     hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
                 ),
                 secondary_y=True,
@@ -334,8 +207,8 @@ number_hours = 4
 
 time_frame = "minute"
 time_limit = datetime.utcnow() - timedelta(hours=number_hours)
-result = hour_trans_by_account(time_limit=time_limit, time_frame=time_frame)
-df_hour = pd.DataFrame(result)
+result_hour = hour_trans_by_account(time_limit=time_limit, time_frame=time_frame)
+df_hour = pd.DataFrame(result_hour)
 st.title(f"Last {number_hours} hours of {metric_desc} per minute by Accounts")
 if df_hour.empty:
     st.markdown("## No data")
