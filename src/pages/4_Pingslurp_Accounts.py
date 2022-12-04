@@ -13,8 +13,6 @@ from pymongo import MongoClient
 
 from hive_rc_auto.helpers.markdown.static_text import import_text
 from hive_rc_auto.helpers.pingslurp_accounts import (
-    all_trans_by_account,
-    all_trans_no_account,
     dataframe_all_transactions_by_account,
     dataframe_all_transactions_no_account,
     hour_trans_by_account,

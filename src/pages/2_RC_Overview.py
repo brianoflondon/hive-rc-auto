@@ -11,11 +11,15 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
+from pymongo import MongoClient
 from streamlit_autorefresh import st_autorefresh
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.markdown.static_text import import_text
-from hive_rc_auto.helpers.rc_delegation import RCAccount, get_mongo_db
+from hive_rc_auto.helpers.pingslurp_accounts import (
+    dataframe_all_transactions_by_account,
+)
+from hive_rc_auto.helpers.rc_delegation import RCAccount
 
 ALL_MARKDOWN = import_text()
 
@@ -54,7 +58,7 @@ def rc_guage(rc: RCAccount):
 
 
 def build_rc_graph(
-    df: pd.DataFrame, df_rc_changes: pd.DataFrame, hive_acc: str
+    df: pd.DataFrame, df_rc_changes: pd.DataFrame, hive_acc: str, df_size: pd.DataFrame = pd.DataFrame()
 ) -> go.Figure:
     start = timer()
     dfa = df[df.account == hive_acc]
@@ -68,19 +72,40 @@ def build_rc_graph(
             name="RC %",
             text=[f"{ts:%d %H:%M}" for ts in dfa.index],
             hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.1f}%",
+            line = dict(color='blue'),
         ),
         secondary_y=True,
     )
-    fig.add_trace(
-        go.Scatter(
-            x=dfa.age_hours,
-            y=dfa["real_mana"],
-            name="RC",
-            text=[f"{ts:%d %H:%M}" for ts in dfa.index],
-            hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.3s}",
-        ),
-        secondary_y=False,
-    )
+    if st.session_state.show_size:
+        if not df_size.empty:
+            df_size["age_hours"] = (datetime.utcnow() - df_size.index).total_seconds() / 3600
+            df_size_a = df_size[df_size.account == hive_acc]
+            if not df_size_a.empty:
+                fig.update_yaxes(title_text="<b>Bytes/min</b>", secondary_y=False)
+                fig.add_trace(
+                    go.Scatter(
+                        x=df_size_a.age_hours,
+                        y=df_size_a["total_size"].rolling('4H', closed='neither').mean(),
+                        name="Bytes/min",
+                        text=[f"{ts:%d %H:%M}" for ts in df_size_a.index],
+                        hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.0f} bytes",
+                        line = dict(color='lightgreen'),
+                    ),
+                    secondary_y=False,
+                )
+    if not st.session_state.show_size or df_size.empty:
+        fig.update_yaxes(title_text="<b>RC</b>", secondary_y=False)
+        fig.add_trace(
+            go.Scatter(
+                x=dfa.age_hours,
+                y=dfa["real_mana"],
+                name="RC",
+                text=[f"{ts:%d %H:%M}" for ts in dfa.index],
+                hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.3s}",
+                line = dict(color='red'),
+            ),
+            secondary_y=False,
+        )
 
     # Very expensive shows each change
     if not df_rc_changes.empty:
@@ -108,7 +133,6 @@ def build_rc_graph(
     )
     # Set y-axes titles
     fig.update_yaxes(title_text="<b>RC %</b>", secondary_y=True)
-    fig.update_yaxes(title_text="<b>RC</b>", secondary_y=False)
 
     yaxes_range_max = dfa["real_mana_percent"].max() + 5
     fig.update_yaxes(range=[0, yaxes_range_max], secondary_y=True)
@@ -127,40 +151,37 @@ def build_rc_graph(
     return fig
 
 
-async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
+def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Fetch data from Mongodb returns two dataframes:
     # df -> main data of rc levels
     # df_rc_changes -> data for changes.
+    DB_CONNECTION = os.getenv("DB_CONNECTION")
+    CLIENT = MongoClient(DB_CONNECTION)
+    db_rc_ts = CLIENT["rc_podping"][Config.DB_NAME]
 
-    db_rc_ts = get_mongo_db(Config.DB_NAME)
     if st.session_state.hours == "All":
         time_limit = timedelta(weeks=4)
     else:
         time_limit = timedelta(hours=st.session_state.hours)
     earliest_data = datetime.utcnow() - time_limit
 
-    cursor = db_rc_ts.find(
+    result = db_rc_ts.find(
         {"real_mana": {"$ne": None}, "timestamp": {"$gte": earliest_data}}, {"_id": 0}
     )
 
-    data = []
-    async for doc in cursor:
-        data.append(doc)
-
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(result)
     if not df.empty:
         df["age"] = datetime.utcnow() - df.timestamp
         df.set_index("timestamp", inplace=True)
         df["age_hours"] = df["age"].dt.total_seconds() / 3600
 
-        db_rc_ts_deleg = get_mongo_db(Config.DB_NAME_DELEG)
-        cursor = db_rc_ts_deleg.find({"timestamp": {"$gte": earliest_data}}, {"_id": 0})
-        data = []
-        async for doc in cursor:
-            data.append(doc)
+        db_rc_ts_deleg = CLIENT["rc_podping"][Config.DB_NAME_DELEG]
+        result2 = db_rc_ts_deleg.find(
+            {"timestamp": {"$gte": earliest_data}}, {"_id": 0}
+        )
 
-        df_rc_changes = pd.DataFrame(data)
-        if data:
+        df_rc_changes = pd.DataFrame(result2)
+        if not df_rc_changes.empty:
             df_rc_changes["age"] = datetime.utcnow() - df_rc_changes.timestamp
             df_rc_changes.set_index("timestamp", inplace=True)
             df_rc_changes["age_hours"] = df_rc_changes["age"].dt.total_seconds() / 3600
@@ -173,8 +194,6 @@ async def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 def hours_selectbox():
     hours_selectbox_options = [4, 8, 24, 72, "All"]
-    cols = st.columns(3)
-    cols[0].subheader("RC Levels")
     st.session_state.hours = st.sidebar.selectbox(
         label="Hours",
         options=hours_selectbox_options,
@@ -183,10 +202,38 @@ def hours_selectbox():
         # on_change=st.experimental_rerun(),
     )
 
+def size_selectbox():
+    size_selectbox_options = {
+        "Show Data bytes/min": True,
+        "Show RC (vests)": False
+    }
+    show_size_choice = st.sidebar.selectbox(
+        label="Show Size/RC vests",
+        options=size_selectbox_options.keys(),
+        index=0,
+        help="Show either the amount of data written to Hive bytes per hour or Absolute RC level in vests",
+    )
+    st.session_state.show_size = size_selectbox_options[show_size_choice]
 
-async def grid(ncol: int = 2):
 
-    df, df_rc_changes = await get_data()
+def grid(ncol: int = 2):
+
+    df, df_rc_changes = get_data()
+    hours = st.session_state.hours
+    if hours == "All":
+        hours = int(4*24*7*4)
+    time_range = {
+        "$match": {
+            "timestamp": {
+                "$gt": datetime.utcnow() - timedelta(hours=hours)
+            }
+        }
+    }
+    livetest_filter = {"$match": {}}
+
+    df_size = dataframe_all_transactions_by_account(
+        time_frame="minute", time_range=time_range, livetest_filter=livetest_filter
+    )
     df_delegating = df[df["delegating"] == "delegating"]
     del_accounts = df_delegating.account.unique()
     all_accounts = df[df.delegating == "target"].account.unique()
@@ -220,27 +267,15 @@ async def grid(ncol: int = 2):
         col = cols2[i % ncol]
         dfa = df[df.account == hive_acc]
         col.plotly_chart(
-            build_rc_graph(df, df_rc_changes, hive_acc), use_container_width=True
+            build_rc_graph(df, df_rc_changes, hive_acc, df_size), use_container_width=True
         )
 
 
-def run_async(func: Callable, params=None):
-    loop = asyncio.get_running_loop()
-    asyncio.run_coroutine_threadsafe(func(params), loop=loop)
-
-
-async def rerun_after_data_update():
-    await asyncio.sleep(Config.UPDATE_FREQUENCY_SECS)
-    # await asyncio.sleep(3)
-    logging.info("Re-running for new data")
-    st.experimental_rerun()
-
-
-async def main_loop():
+def main_loop():
     logging.info(f"Running at {datetime.now()}")
     if "hours" not in st.session_state:
         st.session_state.hours = 24
-    await grid(ncol=3)
+    grid(ncol=3)
     st.markdown(ALL_MARKDOWN["rc_overview"])
 
     # await rerun_after_data_update()
@@ -263,31 +298,21 @@ if __name__ == "__main__":
         layout="wide",
         initial_sidebar_state="expanded",
     )
+    cols = st.columns(3)
+    cols[0].subheader("RC Levels")
     hours_selectbox()
+    size_selectbox()
     st.sidebar.markdown(ALL_MARKDOWN["rc_overview"])
     # try:
-    asyncio.run(main_loop())
-    try:
-        df = st.session_state.df_rc_changes
-        df.sort_values(by="age", ascending=True, inplace=True)
-        if not df.empty:
-            df["link"] = f"[Link](https://hive.ausbit.dev/tx/" + df["trx_id"] + ")"
-            df = df.drop(
-                ["deleg", "age", "trx_num", "trx_id", "block_num", "account"], axis=1
-            )
-            mkd = df.to_markdown()
-            st.markdown(mkd)
-            st.dataframe(df, use_container_width=True)
+    main_loop()
 
-
-    except AttributeError:
-        pass
-    except Exception as e:
-        logging.error(e)
-    # except KeyboardInterrupt:
-    #     logging.info("Terminated with Ctrl-C")
-    # except asyncio.CancelledError:
-    #     logging.info("Asyncio cancelled")
-
-    # except Exception as ex:
-    #     logging.error(ex.__class__)
+    df = st.session_state.df_rc_changes
+    df.sort_values(by="age", ascending=True, inplace=True)
+    if not df.empty:
+        df["link"] = f"[Link](https://hive.ausbit.dev/tx/" + df["trx_id"] + ")"
+        df = df.drop(
+            ["deleg", "age", "trx_num", "trx_id", "block_num", "account"], axis=1
+        )
+        mkd = df.to_markdown()
+        st.markdown(mkd)
+        st.dataframe(df, use_container_width=True)
