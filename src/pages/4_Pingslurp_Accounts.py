@@ -31,7 +31,7 @@ start = timer()
 metrics_options = {
     "Total IRIs": "total_iris",
     "Total Podpings": "total_podpings",
-    "Total Size (Kb)": "total_size_kb",
+    "Data (Kb/hour)": "total_size_kb",
     "Average Size (b)": "avg_size",
 }
 
@@ -59,6 +59,35 @@ time_range_options = {
 
 display_all_options = {"Display All": True, "Only Summaries": False}
 
+
+def set_query_params():
+    params = {
+        "metric": st.session_state.metric,
+        "livetest": st.session_state.livetest_choice,
+        "dispaly": st.session_state.display_all,
+        "time_range": st.session_state.time_range_choice,
+    }
+
+    st.experimental_set_query_params(**params)
+
+
+params = st.experimental_get_query_params()
+metric_index = 0
+livetest_index = 0
+display_index = 0
+timer_range_index = 0
+
+for param in params:
+    if param == "metric":
+        metric_index = list(metrics_options).index(params[param][0])
+    if param == "livetest":
+        livetest_index = list(livetest_filter_options).index(params[param][0])
+    if param == "display":
+        display_index = list(display_all_options).index(params[param][0])
+    if param == "time_range":
+        timer_range_index = list(time_range_options).index(params[param][0])
+
+
 logging.info(f"Loading pingslurp_accounts")
 st.set_page_config(
     page_title="Podpings by Accounts",
@@ -68,27 +97,34 @@ st.set_page_config(
     menu_items=None,
 )
 
+
 st.session_state.metric = st.sidebar.selectbox(
-    label="Metric", options=metrics_options.keys(), help="Metric to show"
+    label="Metric",
+    options=metrics_options.keys(),
+    help="Metric to show",
+    index=metric_index,
+    on_change=set_query_params(),
 )
 st.session_state.livetest_choice = st.sidebar.selectbox(
     label="Live Tests",
     options=livetest_filter_options.keys(),
-    index=0,
+    index=livetest_index,
     help=(
         "Show/Hide Live Tests. "
         "Some fake podpings are sent out during testing, "
         "these are usually hidden but can be shown with this option."
     ),
+    on_change=set_query_params(),
 )
 
 st.session_state.display_all_choice = st.sidebar.selectbox(
     label="Display All",
     options=display_all_options.keys(),
-    index=0,
+    index=display_index,
     help=(
         "Show details for every Hive Account sending podpings or just summary traces"
     ),
+    on_change=set_query_params(),
 )
 st.session_state.display_all = display_all_options[st.session_state.display_all_choice]
 
@@ -97,7 +133,10 @@ st.session_state.livetest_filter = livetest_filter_options[
 ]
 
 st.session_state.time_range_choice = st.sidebar.selectbox(
-    label="Time Range", options=time_range_options.keys()
+    label="Time Range",
+    options=time_range_options.keys(),
+    index=timer_range_index,
+    on_change=set_query_params(),
 )
 st.session_state.time_range = time_range_options[st.session_state.time_range_choice]
 st.session_state.time_range_days = int(st.session_state.time_range_choice.split()[0])
@@ -109,6 +148,7 @@ metric = metrics_options[choice]
 metric_desc = choice
 
 time_frame = "hour"
+
 
 df = dataframe_all_transactions_by_account()
 st.title(body=f"{metric_desc} Sent per Hour by each account")
