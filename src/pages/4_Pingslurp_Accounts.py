@@ -57,48 +57,7 @@ time_range_options = {
     },
 }
 
-display_all_options = {"Display All": "desplay_all", "Only Summaries": "only_summaries"}
-
-
-def set_query_params():
-    # return
-    params = {
-        "metric": st.session_state.metric,
-        "livetest": st.session_state.livetest_choice,
-        "display": st.session_state.display_all_choice,
-        "time_range": st.session_state.time_range_choice,
-    }
-
-    st.experimental_set_query_params(**params)
-
-
-params = st.experimental_get_query_params()
-metric_index = 0
-livetest_index = 0
-display_index = 0
-time_range_index = 0
-
-if st.session_state.get('metric') is None:
-    st.session_state.metric = list(metrics_options)[metric_index]
-if st.session_state.get('livetest_choice') is None:
-    st.session_state.livetest_choice = list(livetest_filter_options)[livetest_index]
-if st.session_state.get('display') is None:
-    st.session_state.display_all_choice = list(display_all_options)[display_index]
-if st.session_state.get('time_range') is None:
-    st.session_state.time_range_choice = list(time_range_options)[time_range_index]
-
-
-
-for param in params:
-    if param == "metric":
-        metric_index = list(metrics_options).index(params[param][0])
-    if param == "livetest":
-        livetest_index = list(livetest_filter_options).index(params[param][0])
-    if param == "display":
-        display_index = list(display_all_options).index(params[param][0])
-    if param == "time_range":
-        time_range_index = list(time_range_options).index(params[param][0])
-
+display_all_options = {"Display All": True, "Only Summaries": False}
 
 logging.info(f"Loading pingslurp_accounts")
 st.set_page_config(
@@ -110,35 +69,27 @@ st.set_page_config(
 )
 
 st.session_state.metric = st.sidebar.selectbox(
-    label="Metric",
-    options=metrics_options.keys(),
-    help="Metric to show",
-    index=metric_index,
-    on_change=set_query_params(),
+    label="Metric", options=metrics_options.keys(), help="Metric to show"
 )
 st.session_state.livetest_choice = st.sidebar.selectbox(
     label="Live Tests",
     options=livetest_filter_options.keys(),
-    index=livetest_index,
+    index=0,
     help=(
         "Show/Hide Live Tests. "
         "Some fake podpings are sent out during testing, "
         "these are usually hidden but can be shown with this option."
     ),
-    on_change=set_query_params(),
 )
 
 st.session_state.display_all_choice = st.sidebar.selectbox(
     label="Display All",
     options=display_all_options.keys(),
-    index=display_index,
+    index=0,
     help=(
         "Show details for every Hive Account sending podpings or just summary traces"
     ),
-    on_change=set_query_params(),
 )
-
-
 st.session_state.display_all = display_all_options[st.session_state.display_all_choice]
 
 st.session_state.livetest_filter = livetest_filter_options[
@@ -146,10 +97,7 @@ st.session_state.livetest_filter = livetest_filter_options[
 ]
 
 st.session_state.time_range_choice = st.sidebar.selectbox(
-    label="Time Range",
-    options=time_range_options.keys(),
-    index=time_range_index,
-    on_change=set_query_params(),
+    label="Time Range", options=time_range_options.keys()
 )
 st.session_state.time_range = time_range_options[st.session_state.time_range_choice]
 st.session_state.time_range_days = int(st.session_state.time_range_choice.split()[0])
@@ -161,7 +109,6 @@ metric = metrics_options[choice]
 metric_desc = choice
 
 time_frame = "hour"
-
 
 df = dataframe_all_transactions_by_account()
 st.title(body=f"{metric_desc} Sent per Hour by each account")
