@@ -58,7 +58,10 @@ def rc_guage(rc: RCAccount):
 
 
 def build_rc_graph(
-    df: pd.DataFrame, df_rc_changes: pd.DataFrame, hive_acc: str, df_size: pd.DataFrame = pd.DataFrame()
+    df: pd.DataFrame,
+    df_rc_changes: pd.DataFrame,
+    hive_acc: str,
+    df_size: pd.DataFrame = pd.DataFrame(),
 ) -> go.Figure:
     start = timer()
     dfa = df[df.account == hive_acc]
@@ -72,24 +75,29 @@ def build_rc_graph(
             name="RC %",
             text=[f"{ts:%d %H:%M}" for ts in dfa.index],
             hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.1f}%",
-            line = dict(color='blue'),
+            line=dict(color="blue"),
         ),
         secondary_y=True,
     )
     if st.session_state.show_size:
         if not df_size.empty:
-            df_size["age_hours"] = (datetime.utcnow() - df_size.index).total_seconds() / 3600
+            df_size["age_hours"] = (
+                datetime.utcnow() - df_size.index
+            ).total_seconds() / 3600
             df_size_a = df_size[df_size.account == hive_acc]
             if not df_size_a.empty:
                 fig.update_yaxes(title_text="<b>Bytes/min</b>", secondary_y=False)
                 fig.add_trace(
                     go.Scatter(
                         x=df_size_a.age_hours,
-                        y=df_size_a["total_size"].rolling('4H', closed='neither').mean(),
+                        y=df_size_a["total_size"]
+                        .rolling("4H", closed="neither")
+                        .mean(),
                         name="Bytes/min",
                         text=[f"{ts:%d %H:%M}" for ts in df_size_a.index],
-                        hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.0f} bytes",
-                        line = dict(color='lightgreen'),
+                        hovertemplate="-%{x:.1f} hours<br>%{text}"
+                        + "<br>%{y:,.0f} bytes",
+                        line=dict(color="lightgreen"),
                     ),
                     secondary_y=False,
                 )
@@ -102,7 +110,7 @@ def build_rc_graph(
                 name="RC",
                 text=[f"{ts:%d %H:%M}" for ts in dfa.index],
                 hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.3s}",
-                line = dict(color='red'),
+                line=dict(color="red"),
             ),
             secondary_y=False,
         )
@@ -112,7 +120,7 @@ def build_rc_graph(
         df_rc_change = df_rc_changes[df_rc_changes.account == hive_acc]
         if not df_rc_change.empty:
             for index, row in df_rc_change.iterrows():
-                up_down = "down" if row.cut else "up"
+                linecolor = "g" if row.cut else "up"
                 fig.add_vline(
                     x=row.age_hours,
                     line_width=0.6,
@@ -193,7 +201,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def hours_selectbox():
-    hours_selectbox_options = [4, 8, 24, 72, "All"]
+    hours_selectbox_options = [4, 8, 24, 72, 168, 336, "All"]
     st.session_state.hours = st.sidebar.selectbox(
         label="Hours",
         options=hours_selectbox_options,
@@ -202,11 +210,9 @@ def hours_selectbox():
         # on_change=st.experimental_rerun(),
     )
 
+
 def size_selectbox():
-    size_selectbox_options = {
-        "Show Data bytes/min": True,
-        "Show RC (vests)": False
-    }
+    size_selectbox_options = {"Show Data bytes/min": True, "Show RC (vests)": False}
     show_size_choice = st.sidebar.selectbox(
         label="Show Size/RC vests",
         options=size_selectbox_options.keys(),
@@ -221,13 +227,9 @@ def grid(ncol: int = 2):
     df, df_rc_changes = get_data()
     hours = st.session_state.hours
     if hours == "All":
-        hours = int(4*24*7*4)
+        hours = int(4 * 24 * 7 * 4)
     time_range = {
-        "$match": {
-            "timestamp": {
-                "$gt": datetime.utcnow() - timedelta(hours=hours)
-            }
-        }
+        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(hours=hours)}}
     }
     livetest_filter = {"$match": {}}
 
@@ -267,7 +269,8 @@ def grid(ncol: int = 2):
         col = cols2[i % ncol]
         dfa = df[df.account == hive_acc]
         col.plotly_chart(
-            build_rc_graph(df, df_rc_changes, hive_acc, df_size), use_container_width=True
+            build_rc_graph(df, df_rc_changes, hive_acc, df_size),
+            use_container_width=True,
         )
 
 
