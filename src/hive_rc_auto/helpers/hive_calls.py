@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timedelta
 from random import shuffle
 from typing import Any, Callable, List, Optional, Union
 
@@ -158,24 +159,62 @@ def get_rcs(check_accounts: List[str]) -> dict:
     )
 
 
+def price_feed_update_needed(base: float) -> bool:
+    """
+    Check if previous run of price feed has put an output file down and the
+    age of the feed is less than 12 hours.
+    Returns false if there is no need to update the feed.
+    """
+    try:
+        if os.path.isfile("price_feed.json"):
+            with open("price_feed.json", "r") as f:
+                prev_ans = json.load(f)
+                prev_base = prev_ans.get("base")
+                prev_timestamp = prev_ans.get("timestamp")
+            if prev_base and prev_timestamp:
+                per_diff = abs(base - prev_base) / ((base + prev_base) / 2)
+                quote_timediff = timedelta(
+                    seconds=int(datetime.utcnow().timestamp() - prev_timestamp)
+                )
+                if abs(per_diff) < 0.02 and quote_timediff.total_seconds() < (12 * 3600):
+                    logging.info(
+                        f"Price feed un-changed | Base: {base:.3f} | "
+                        f"Change: {per_diff*100:.1f} % | "
+                        f"Age: {quote_timediff}"
+                    )
+                    return False
+    except Exception as ex:
+        logging.error(f"Problem checking old feed price {ex}")
+    return True
+
+
 async def publish_feed(publisher: str = "brianoflondon") -> bool:
     """Publishes a price feed to Hive"""
     try:
         resp = httpx.get("https://api.v4v.app/v1/cryptoprices/?use_cache=true")
         if resp.status_code == 200:
             rjson = resp.json()
-            base = rjson['v4vapp']['Hive_HBD']
-            client = get_client(posting_keys=[Config.WITNESS_ACTIVE_KEY])
-            op = Operation(
-                "feed_publish",
-                {
-                    "publisher": publisher,
-                    "exchange_rate": {"base": f"{base:.3f} HBD", "quote": "1.000 HIVE"},
-                },
-            )
-            trx = client.broadcast_sync(op=op, dry_run=False)
-            logging.info(f"Price feed published: {trx}")
-            return True
+            base: float = rjson["v4vapp"]["Hive_HBD"]
+            if price_feed_update_needed(base):
+                client = get_client(posting_keys=[Config.WITNESS_ACTIVE_KEY])
+                op = Operation(
+                    "feed_publish",
+                    {
+                        "publisher": publisher,
+                        "exchange_rate": {
+                            "base": f"{base:.3f} HBD",
+                            "quote": "1.000 HIVE",
+                        },
+                    },
+                )
+                trx = client.broadcast_sync(op=op, dry_run=False)
+                logging.info(f"Price feed published: {trx}")
+                with open("price_feed.json", "w") as f:
+                    json.dump(
+                        {"base": base, "timestamp": datetime.utcnow().timestamp()}, f
+                    )
+        return True
+
     except Exception as ex:
         logging.exception(ex)
         logging.error(f"Exception publishing price feed: {ex}")

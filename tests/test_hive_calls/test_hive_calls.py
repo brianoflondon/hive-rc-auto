@@ -65,8 +65,3 @@ async def test_check_all_rpc_nodes():
 async def test_publish_feed_brianoflondon():
     assert await publish_feed()
 
-
-@pytest.mark.asyncio
-async def test_publish_feed_apshamilton():
-    ans =await publish_feed("apshamilton")
-    assert ans is False
