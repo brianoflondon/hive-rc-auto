@@ -57,14 +57,15 @@ time_range_options = {
     },
 }
 
-display_all_options = {"Display All": True, "Only Summaries": False}
+display_all_options = {"Display All": "desplay_all", "Only Summaries": "only_summaries"}
 
 
 def set_query_params():
+    # return
     params = {
         "metric": st.session_state.metric,
         "livetest": st.session_state.livetest_choice,
-        "dispaly": st.session_state.display_all,
+        "display": st.session_state.display_all_choice,
         "time_range": st.session_state.time_range_choice,
     }
 
@@ -75,7 +76,18 @@ params = st.experimental_get_query_params()
 metric_index = 0
 livetest_index = 0
 display_index = 0
-timer_range_index = 0
+time_range_index = 0
+
+if st.session_state.get('metric') is None:
+    st.session_state.metric = list(metrics_options)[metric_index]
+if st.session_state.get('livetest_choice') is None:
+    st.session_state.livetest_choice = list(livetest_filter_options)[livetest_index]
+if st.session_state.get('display') is None:
+    st.session_state.display_all_choice = list(display_all_options)[display_index]
+if st.session_state.get('time_range') is None:
+    st.session_state.time_range_choice = list(time_range_options)[time_range_index]
+
+
 
 for param in params:
     if param == "metric":
@@ -85,7 +97,7 @@ for param in params:
     if param == "display":
         display_index = list(display_all_options).index(params[param][0])
     if param == "time_range":
-        timer_range_index = list(time_range_options).index(params[param][0])
+        time_range_index = list(time_range_options).index(params[param][0])
 
 
 logging.info(f"Loading pingslurp_accounts")
@@ -96,7 +108,6 @@ st.set_page_config(
     initial_sidebar_state="auto",
     menu_items=None,
 )
-
 
 st.session_state.metric = st.sidebar.selectbox(
     label="Metric",
@@ -126,6 +137,8 @@ st.session_state.display_all_choice = st.sidebar.selectbox(
     ),
     on_change=set_query_params(),
 )
+
+
 st.session_state.display_all = display_all_options[st.session_state.display_all_choice]
 
 st.session_state.livetest_filter = livetest_filter_options[
@@ -135,7 +148,7 @@ st.session_state.livetest_filter = livetest_filter_options[
 st.session_state.time_range_choice = st.sidebar.selectbox(
     label="Time Range",
     options=time_range_options.keys(),
-    index=timer_range_index,
+    index=time_range_index,
     on_change=set_query_params(),
 )
 st.session_state.time_range = time_range_options[st.session_state.time_range_choice]
