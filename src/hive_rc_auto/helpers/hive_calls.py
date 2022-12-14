@@ -158,7 +158,7 @@ def get_rcs(check_accounts: List[str]) -> dict:
     )
 
 
-async def publish_feed() -> bool:
+async def publish_feed(publisher: str = "brianoflondon") -> bool:
     """Publishes a price feed to Hive"""
     try:
         resp = httpx.get("https://api.v4v.app/v1/cryptoprices/?use_cache=true")
@@ -169,7 +169,7 @@ async def publish_feed() -> bool:
             op = Operation(
                 "feed_publish",
                 {
-                    "publisher": "brianoflondon",
+                    "publisher": publisher,
                     "exchange_rate": {"base": f"{base:.3f} HBD", "quote": "1.000 HIVE"},
                 },
             )

@@ -4,6 +4,10 @@ import subprocess
 from timeit import default_timer as timer
 
 import pytest
+
+# from hived_rpc_scanner.runner import runner
+from lighthive.node_picker import compare_nodes
+
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
     get_client,
@@ -12,8 +16,6 @@ from hive_rc_auto.helpers.hive_calls import (
     make_lighthive_call,
     publish_feed,
 )
-# from hived_rpc_scanner.runner import runner
-from lighthive.node_picker import compare_nodes
 
 
 @pytest.mark.asyncio
@@ -58,6 +60,13 @@ async def test_check_all_rpc_nodes():
     logging.info(f"hived_rpc_scanner --nodes {' '.join(nodes)}")
     nodes = "https://rpc.ecency.com"
 
+
 @pytest.mark.asyncio
-async def test_publish_feed():
+async def test_publish_feed_brianoflondon():
     assert await publish_feed()
+
+
+@pytest.mark.asyncio
+async def test_publish_feed_apshamilton():
+    ans =await publish_feed("apshamilton")
+    assert ans is False
