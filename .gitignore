@@ -128,4 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .vscode/settings.json
+
+# BOL
 price_feed.json
+**/.DS_Store
