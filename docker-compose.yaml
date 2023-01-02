@@ -7,6 +7,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    logging:
+      driver: "json-file"
+      options:
+          max-file: "5"
+          max-size: "10m"
     env_file:
       - ".env"
     # environment:
@@ -14,7 +19,6 @@ services:
     command: bash -c "python bot.py"
     restart: unless-stopped
     networks:
-      - pingslurp_pingslurp
       - hive-network
 
 
@@ -23,6 +27,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    logging:
+      driver: "json-file"
+      options:
+          max-file: "5"
+          max-size: "10m"
     env_file:
       - ".env"
     ports:
@@ -34,12 +43,20 @@ services:
     command: bash -c "streamlit run Podping.py"
     restart: unless-stopped
     networks:
-      - pingslurp_pingslurp
       - hive-network
 
+  pricefeed:
+    container_name: v4vapp-pricefeed
+    image: brianoflondon/v4vapphivepricefeed:latest
+    logging:
+      driver: "json-file"
+      options:
+          max-file: "5"
+          max-size: "10m"
+    env_file:
+      - ".env"
+    restart: unless-stopped
 
 networks:
-  pingslurp_pingslurp:
-    external: true
   hive-network:
     external: true
