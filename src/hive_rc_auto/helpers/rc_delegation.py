@@ -10,14 +10,8 @@ from pymongo.errors import ServerSelectionTimeoutError
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
-    HiveTrx,
-    get_client,
-    get_delegated_posting_auth_accounts,
-    get_rcs,
-    get_tracking_accounts,
-    make_lighthive_call,
-    send_custom_json,
-)
+    HiveTrx, get_client, get_delegated_posting_auth_accounts, get_rcs,
+    get_tracking_accounts, make_lighthive_call, send_custom_json)
 
 DB_NAME = "rc_podping"
 

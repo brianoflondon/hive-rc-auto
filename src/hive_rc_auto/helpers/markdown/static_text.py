@@ -1,5 +1,5 @@
 from glob import glob
-from os.path import dirname, exists, join, split
+from os.path import dirname, exists
 from pathlib import Path
 
 ALL_MARKDOWN = {}
