@@ -1,8 +1,11 @@
+import asyncio
 import os
+from typing import List, OrderedDict
 
 import httpx
 import pandas as pd
 import streamlit as st
+import xmltodict
 from pymongo import MongoClient
 
 from hive_rc_auto.helpers.markdown.static_text import import_text
@@ -66,8 +69,70 @@ st.header(
 
 df = pd.DataFrame(result)
 df.rename(columns={"_id": "iri"}, inplace=True)
+df.set_index("count", inplace=True)
 print(df)
 st.dataframe(df)
 
-for index, row in df.iterrows():
-    print(row["iri"], row["count"])
+iris = [row["iri"] for index, row in df.iterrows()]
+iris = iris[:5]
+
+
+async def lookup_all(df: pd.DataFrame):
+    iris = [row["iri"] for index, row in df.iterrows()]
+    iris = iris[:5]
+    answer = {}
+    async with asyncio.TaskGroup() as tg:
+        for iri in iris:
+            answer[iri] = tg.create_task(lookup_iri(iri))
+
+    cols = st.columns(5)
+    n = 0
+    for index, row in df.iterrows():
+        iri = row["iri"]
+        if answer.get(iri) and answer[iri].result():
+            col = cols[n]
+            (title, image) = answer[iri].result()
+            if image is None:
+                image = "pages/android-chrome-512x512.png"
+            caption = f"{title}"
+            col.image(image=image, width=100)
+            col.write(title)
+            col.write(f"Repeats: {index}")
+            col.write(iri)
+            n += 1
+
+
+def get_feed_title(feed_xml: OrderedDict) -> str | None:
+    try:
+        return feed_xml["rss"]["channel"]["title"]
+    except Exception:
+        return None
+
+
+def get_feed_image(feed_xml: OrderedDict) -> str | None:
+    try:
+        return feed_xml["rss"]["channel"]["image"]["url"]
+    except Exception:
+        try:
+            return feed_xml["rss"]["channel"]["itunes:image"]["@href"]
+        except Exception:
+            return None
+
+
+async def lookup_iri(iri: str) -> str:
+    async with httpx.AsyncClient() as client:
+        user_agent = {"User-agent": "Pingslurp for Podping"}
+        try:
+            resp = await client.get(iri, headers=user_agent, follow_redirects=True)
+            print(iri, resp.status_code)
+            if resp.status_code == 200:
+                feed_xml = xmltodict.parse(resp.content)
+                title = get_feed_title(feed_xml)
+                channel_image = get_feed_image(feed_xml)
+                return title, channel_image
+        except Exception as ex:
+            print(ex.__repr__(), ex)
+            return None
+
+
+asyncio.run(lookup_all(df))
