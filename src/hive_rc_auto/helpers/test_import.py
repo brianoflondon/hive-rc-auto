@@ -1,2 +1,2 @@
-class SomeClass():
+class SomeClass:
     value: int = 42

@@ -8,6 +8,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 from pymongo import MongoClient
 from hive_rc_auto.helpers.markdown.static_text import import_text
+
 ALL_MARKDOWN = import_text()
 
 DB_CONNECTION = os.getenv("DB_CONNECTION")
@@ -106,7 +107,7 @@ result_recent_ping = CLIENT["pingslurp"]["hosts_ts"].aggregate(
 df_recent_ping = pd.DataFrame(result_recent_ping)
 df_recent_ping["age"] = datetime.utcnow() - df_recent_ping["timestamp"]
 df_recent_ping.rename(columns={"_id": "host"}, inplace=True)
-df_recent_ping.set_index('timestamp', inplace=True)
+df_recent_ping.set_index("timestamp", inplace=True)
 df_recent_ping.sort_index(inplace=True, ascending=False)
 
 hosts_sorted = df.host.unique()
@@ -211,7 +212,7 @@ st.set_page_config(
 
 top_cols = st.columns(2)
 top_cols[0].markdown("# Pingslurp Health")
-st.sidebar.markdown(ALL_MARKDOWN['pingslurp_hosts'])
+st.sidebar.markdown(ALL_MARKDOWN["pingslurp_hosts"])
 
 ncol = 5
 top_cols[0].subheader("Total Iris sent in the last Hour")
@@ -222,9 +223,11 @@ st.sidebar.plotly_chart(fig, use_container_width=True)
 st.sidebar.subheader("Total")
 cols = st.columns(ncol)
 
+
 def seconds_only(time_delta: timedelta) -> timedelta:
     """Strip out microseconds"""
     return time_delta - timedelta(microseconds=time_delta.microseconds)
+
 
 hosts = df_summary.sort_values(by="hour_1", ascending=False)["host"]
 for i, host in enumerate(hosts.iloc[1:]):

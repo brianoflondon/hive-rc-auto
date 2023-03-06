@@ -176,7 +176,9 @@ def price_feed_update_needed(base: float) -> bool:
                 quote_timediff = timedelta(
                     seconds=int(datetime.utcnow().timestamp() - prev_timestamp)
                 )
-                if abs(per_diff) < 0.02 and quote_timediff.total_seconds() < (12 * 3600):
+                if abs(per_diff) < 0.02 and quote_timediff.total_seconds() < (
+                    12 * 3600
+                ):
                     logging.info(
                         f"Price feed un-changed | Base: {base:.3f} | "
                         f"Change: {per_diff*100:.1f} % | "

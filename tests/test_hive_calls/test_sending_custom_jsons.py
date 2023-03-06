@@ -86,5 +86,3 @@ async def test_send_multiple_payloads():
     except Exception as ex:
         assert False
     assert trx
-
-

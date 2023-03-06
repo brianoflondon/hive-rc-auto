@@ -41,9 +41,10 @@ async def keep_publishing_price_feed():
     while True:
         success = await publish_feed()
         if success:
-            await asyncio.sleep(60*60)
+            await asyncio.sleep(60 * 60)
         else:
             await asyncio.sleep(Config.UPDATE_FREQUENCY_SECS)
+
 
 async def check_db():
     logging.info(Config.DB_CONNECTION)

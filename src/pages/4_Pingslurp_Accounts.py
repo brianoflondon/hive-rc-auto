@@ -135,7 +135,7 @@ else:
                     text=df[df.account == account]["account"],
                     mode="markers",
                     marker=dict(
-                        size=5 + df[df.account == account].total_size / 2 ** 14
+                        size=5 + df[df.account == account].total_size / 2**14
                     ),
                     hovertemplate="%{text}" + "<br>%{x}" + "<br>%{y:,.0f}",
                 ),

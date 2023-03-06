@@ -50,7 +50,7 @@ class Config:
         if not DB_CONNECTION:
             DB_CONNECTION = "mongodb://127.0.0.1:27017"
 
-        MINIMUM_DELEGATION=10_000_000_000
+        MINIMUM_DELEGATION = 10_000_000_000
 
     except AttributeError as ex:
         logging.exception(ex)
