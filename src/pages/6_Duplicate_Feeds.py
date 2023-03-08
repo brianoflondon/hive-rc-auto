@@ -1,6 +1,7 @@
 import asyncio
 import os
-from typing import List, OrderedDict
+from datetime import datetime, timedelta, timezone
+from typing import OrderedDict
 
 import httpx
 import pandas as pd
@@ -9,11 +10,11 @@ import xmltodict
 from pymongo import MongoClient
 
 from hive_rc_auto.helpers.markdown.static_text import import_text
+from hive_rc_auto.helpers.podcastindex import get_podcast_index_info
 
 ALL_MARKDOWN = import_text()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
-from datetime import datetime, timedelta, timezone
 
 st.set_page_config(
     page_title="Duplicated Feeds",
@@ -81,9 +82,11 @@ async def lookup_all(df: pd.DataFrame):
     iris = [row["iri"] for index, row in df.iterrows()]
     iris = iris[:5]
     answer = {}
+    periods = {}
     async with asyncio.TaskGroup() as tg:
         for iri in iris:
             answer[iri] = tg.create_task(lookup_iri(iri))
+            periods[iri] = tg.create_task(check_show_period(iri))
 
     cols = st.columns(5)
     n = 0
@@ -92,12 +95,19 @@ async def lookup_all(df: pd.DataFrame):
         if answer.get(iri) and answer[iri].result():
             col = cols[n]
             (title, image) = answer[iri].result()
+            (min_time, max_time, mean_time) = (
+                periods[iri].result()["min"].total_seconds(),
+                periods[iri].result()["max"].total_seconds(),
+                periods[iri].result()["mean"].total_seconds(),
+            )
             if image is None:
                 image = "pages/android-chrome-512x512.png"
-            caption = f"{title}"
             col.image(image=image, width=100)
             col.write(title)
             col.write(f"Repeats: {index}")
+            col.write("Seconds between pings:")
+            col.write(f"{min_time:.0f} -> {max_time:.0f}")
+            col.write(f"mean: {mean_time:.0f}")
             col.write(iri)
             n += 1
 
@@ -123,8 +133,15 @@ async def lookup_iri(iri: str) -> str:
     async with httpx.AsyncClient() as client:
         user_agent = {"User-agent": "Pingslurp for Podping"}
         try:
+            pod_info = await get_podcast_index_info(iri)
+            if pod_info:
+                if pod_info.artwork:
+                    return pod_info.podcast, pod_info.artwork
+                elif pod_info.image:
+                    return pod_info.podcast, pod_info.image
+
+            # Fetch RSS
             resp = await client.get(iri, headers=user_agent, follow_redirects=True)
-            print(iri, resp.status_code)
             if resp.status_code == 200:
                 feed_xml = xmltodict.parse(resp.content)
                 title = get_feed_title(feed_xml)
@@ -133,6 +150,23 @@ async def lookup_iri(iri: str) -> str:
         except Exception as ex:
             print(ex.__repr__(), ex)
             return None
+
+
+async def check_show_period(check_show: str) -> pd.DataFrame:
+    filter = {
+        "iris": check_show,
+        "$and": [
+            {"timestamp": {"$gt": start_date}},
+            {"timestamp": {"$lt": end_data}},
+        ],
+    }
+    sort = list({"timestamp": -1}.items())
+    one_show = CLIENT["pingslurp"]["all_podpings"].find(filter=filter, sort=sort)
+    df_one_show = pd.DataFrame(one_show)
+    periodicity = df_one_show.timestamp.diff(periods=-1).agg(
+        func=["min", "max", "mean", "median", "std"]
+    )
+    return periodicity
 
 
 asyncio.run(lookup_all(df))
