@@ -166,6 +166,7 @@ async def check_show_period(check_show: str) -> pd.DataFrame:
     periodicity = df_one_show.timestamp.diff(periods=-1).agg(
         func=["min", "max", "mean", "median", "std"]
     )
+    print(periodicity)
     return periodicity
 
 
