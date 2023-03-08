@@ -106,7 +106,8 @@ async def lookup_all(df: pd.DataFrame):
             col.write(title)
             col.write(f"Repeats: {index}")
             col.write("Seconds between pings:")
-            col.write(f"{min_time:.0f} -> {max_time:.0f}")
+            col.write(f"min: {min_time:.0f}")
+            col.write(f"{max_time:.0f}")
             col.write(f"mean: {mean_time:.0f}")
             col.write(iri)
             n += 1
@@ -166,7 +167,6 @@ async def check_show_period(check_show: str) -> pd.DataFrame:
     periodicity = df_one_show.timestamp.diff(periods=-1).agg(
         func=["min", "max", "mean", "median", "std"]
     )
-    print(periodicity)
     return periodicity
 
 
