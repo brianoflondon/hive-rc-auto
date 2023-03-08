@@ -1,7 +1,8 @@
 import asyncio
 import os
 from datetime import datetime, timedelta, timezone
-from typing import OrderedDict
+from timeit import default_timer as timer
+from typing import OrderedDict, Tuple
 
 import httpx
 import pandas as pd
@@ -80,7 +81,8 @@ iris = iris[:5]
 
 async def lookup_all(df: pd.DataFrame):
     iris = [row["iri"] for index, row in df.iterrows()]
-    iris = iris[:5]
+    ncol = 5
+    iris = iris[: ncol * 2]
     answer = {}
     periods = {}
     async with asyncio.TaskGroup() as tg:
@@ -88,12 +90,12 @@ async def lookup_all(df: pd.DataFrame):
             answer[iri] = tg.create_task(lookup_iri(iri))
             periods[iri] = tg.create_task(check_show_period(iri))
 
-    cols = st.columns(5)
+    cols = st.columns(ncol)
     n = 0
     for index, row in df.iterrows():
         iri = row["iri"]
         if answer.get(iri) and answer[iri].result():
-            col = cols[n]
+            col = cols[n % ncol]
             (title, image) = answer[iri].result()
             (min_time, max_time, mean_time) = (
                 periods[iri].result()["min"].total_seconds(),
@@ -106,9 +108,9 @@ async def lookup_all(df: pd.DataFrame):
             col.write(title)
             col.write(f"Repeats: {index}")
             col.write("Seconds between pings:")
-            col.write(f"min: {min_time:.0f}")
-            col.write(f"{max_time:.0f}")
-            col.write(f"mean: {mean_time:.0f}")
+            col.write(f"min (s): {min_time:.0f}")
+            col.write(f"max (s): {max_time:.0f}")
+            col.write(f"mean(s): {mean_time:.0f}")
             col.write(iri)
             n += 1
 
@@ -130,7 +132,7 @@ def get_feed_image(feed_xml: OrderedDict) -> str | None:
             return None
 
 
-async def lookup_iri(iri: str) -> str:
+async def lookup_iri(iri: str) -> Tuple[str, str]:
     async with httpx.AsyncClient() as client:
         user_agent = {"User-agent": "Pingslurp for Podping"}
         try:
@@ -149,11 +151,13 @@ async def lookup_iri(iri: str) -> str:
                 channel_image = get_feed_image(feed_xml)
                 return title, channel_image
         except Exception as ex:
-            print(ex.__repr__(), ex)
-            return None
+            print(iri, ex.__repr__(), ex)
+            return iri, None
 
 
 async def check_show_period(check_show: str) -> pd.DataFrame:
+    print(f"Checking: {check_show}")
+    start = timer()
     filter = {
         "iris": check_show,
         "$and": [
@@ -167,6 +171,7 @@ async def check_show_period(check_show: str) -> pd.DataFrame:
     periodicity = df_one_show.timestamp.diff(periods=-1).agg(
         func=["min", "max", "mean", "median", "std"]
     )
+    print(f"Period check: {check_show} - {timer() - start:.2f} seconds")
     return periodicity
 
 

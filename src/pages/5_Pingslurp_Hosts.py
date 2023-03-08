@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 from pymongo import MongoClient
+
 from hive_rc_auto.helpers.markdown.static_text import import_text
 
 ALL_MARKDOWN = import_text()
