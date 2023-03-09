@@ -1,18 +1,15 @@
-import asyncio
 import logging
 import os
 from datetime import datetime, timedelta
 from itertools import cycle
 from timeit import default_timer as timer
-from typing import Callable, Tuple
+from typing import Tuple
 
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 from pymongo import MongoClient
-from streamlit_autorefresh import st_autorefresh
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.markdown.static_text import import_text

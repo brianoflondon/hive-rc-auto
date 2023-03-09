@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from plotly.subplots import make_subplots
 from pymongo import MongoClient
 
 from hive_rc_auto.helpers.markdown.static_text import import_text
@@ -197,7 +196,7 @@ def gauge(host: str):
     )
 
     fig.update_layout(margin=dict(b=10, t=20, l=15, r=15, autoexpand=True))
-    fig.update_layout(title=dict(font=dict(size=20)))
+    # fig.update_layout(title=dict(font=dict(size=20)))
     fig.update_layout(height=150)
     # fig.update_layout(title_text=host)
     return fig

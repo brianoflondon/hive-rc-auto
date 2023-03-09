@@ -13,7 +13,6 @@ from lighthive.client import Client
 from lighthive.datastructures import Operation
 from lighthive.exceptions import RPCNodeException
 from lighthive.helpers.account import VOTING_MANA_REGENERATION_IN_SECONDS
-from lighthive.node_picker import compare_nodes
 from pydantic import BaseModel, Field
 
 from hive_rc_auto.helpers.config import Config
