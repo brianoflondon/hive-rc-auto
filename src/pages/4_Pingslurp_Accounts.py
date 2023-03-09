@@ -42,20 +42,31 @@ livetest_filter_options = {
     "Only Live Tests": {"$match": {"metadata.id": re.compile(r"pplt_.*")}},
 }
 
-time_range_options = {
-    "10 Days": {
-        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=10)}}
-    },
-    "30 Days": {
-        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=30)}}
-    },
-    "60 Days": {
-        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=60)}}
-    },
-    "90 Days": {
-        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=90)}}
-    },
-}
+time_range_days = [10, 30, 60, 90, 120]
+
+
+def gtr(day: int):
+    return f"{day}", {
+        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=day)}}
+    }
+
+
+time_range_options = {gtr(day)[0]: gtr(day)[1] for day in time_range_days}
+
+# time_range_options = {
+#     "10 Days": {
+#         "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=10)}}
+#     },
+#     "30 Days": {
+#         "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=30)}}
+#     },
+#     "60 Days": {
+#         "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=60)}}
+#     },
+#     "90 Days": {
+#         "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(days=90)}}
+#     },
+# }
 
 display_all_options = {"Display All": True, "Only Summaries": False}
 
