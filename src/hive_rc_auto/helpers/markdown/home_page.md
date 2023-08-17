@@ -11,6 +11,7 @@ For API access see the documentaion: [api.podping.org/docs](https://api.podping.
 ## Podping Using Hosts
 
 3speak.tv
+CastGarden
 Buzzsprout
 RSS.com
 Captivate.fm
