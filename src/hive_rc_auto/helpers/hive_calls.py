@@ -50,7 +50,7 @@ def get_client(
                 "https://rpc.podping.org",
                 "https://hived.emre.sh",
                 "https://api.hive.blog",
-                "https://api.deathwing.me",
+                # "https://api.deathwing.me",
                 "https://hive-api.arcange.eu",
                 # "https://api.openhive.network",
                 "https://rpc.ausbit.dev",
