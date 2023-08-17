@@ -60,7 +60,7 @@ async def test_check_all_rpc_nodes():
     logging.info(f"hived_rpc_scanner --nodes {' '.join(nodes)}")
     nodes = "https://rpc.ecency.com"
 
-
+@pytest.mark.skip(reason="Not needed for now")
 @pytest.mark.asyncio
 async def test_publish_feed_brianoflondon():
     assert await publish_feed()

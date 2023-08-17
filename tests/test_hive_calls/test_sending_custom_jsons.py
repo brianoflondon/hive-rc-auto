@@ -14,14 +14,14 @@ from hive_rc_auto.helpers.hive_calls import (
 from lighthive.datastructures import Operation
 from lighthive.exceptions import RPCNodeException
 
-os.environ["TESTNET"] = "true"
+os.environ["TESTNET"] = "false"
 hive_operation_id = "bol_testing"
 
 
 @pytest.mark.asyncio
 async def test_construct_operation():
     payload = {"key": "value"}
-    payload = {"myfield": uuid.uuid4(), "datetime": datetime.utcnow()}
+    payload = {"myfield": str(uuid.uuid4()), "datetime": datetime.utcnow()}
     op = await construct_operation(
         hive_operation_id=hive_operation_id,
         payload=payload,
@@ -33,7 +33,7 @@ async def test_construct_operation():
 @pytest.mark.asyncio
 async def test_send_custom_json():
     payload = {"key": "value"}
-    payload = {"myfield": uuid.uuid4(), "datetime": datetime.utcnow()}
+    payload = {"myfield": str(uuid.uuid4()), "datetime": datetime.utcnow()}
     op = await construct_operation(
         hive_operation_id=hive_operation_id,
         payload=payload,
