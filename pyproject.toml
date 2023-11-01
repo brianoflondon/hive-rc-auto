@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hive-rc-auto"
-version = "1.6.0"
+version = "1.7.0"
 description = "A system for managing RC Resource Credits on Hive"
 authors = ["Brian of London <brian@podping.org>"]
 license = "MIT"
@@ -12,7 +12,7 @@ streamlit = "^1.13.0"
 watchdog = "^2.1.9"
 black = "^22.10.0"
 pydantic = "^1.10.2"
-lighthive = "^0.4.0"
+lighthive = "^0.4.2"
 python-dotenv = "^0.21.0"
 streamlit-autorefresh = "^0.0.1"
 plotly = "^5.10.0"

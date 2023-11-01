@@ -46,15 +46,16 @@ def get_client(
             nodes = [os.getenv("TESTNET_NODE")]
             chain = {"chain_id": os.getenv("TESTNET_CHAINID")}
         else:
-            nodes = [
-                "https://rpc.podping.org",
-                "https://hived.emre.sh",
-                "https://api.hive.blog",
-                # "https://api.deathwing.me",
-                "https://hive-api.arcange.eu",
-                # "https://api.openhive.network",
-                "https://rpc.ausbit.dev",
-            ]
+            if not nodes:
+                nodes = [
+                    "https://rpc.podping.org",
+                    "https://hived.emre.sh",
+                    "https://api.hive.blog",
+                    # "https://api.deathwing.me",
+                    "https://hive-api.arcange.eu",
+                    # "https://api.openhive.network",
+                    # "https://rpc.ausbit.dev",
+                ]
         client = Client(
             keys=posting_keys,
             nodes=nodes,
@@ -68,6 +69,7 @@ def get_client(
             load_balance_nodes=True,
             circuit_breaker=True,
         )
+        logging.info(f"Client created: {client.current_node}")
         return client(api_type)
     except Exception as ex:
         logging.error("Error getting Hive Client")
@@ -297,6 +299,8 @@ async def send_custom_json(
 
     except RPCNodeException as ex:
         logging.error(f"send_custom_json error: {ex}")
+        logging.error(f"{ex.raw_body}")
+        logging.error(f"{client.current_node}")
         try:
             if re.match(
                 r".*same amount of RC already exist.*",
