@@ -8,8 +8,11 @@ from lighthive.datastructures import Operation
 from lighthive.exceptions import RPCNodeException
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.hive_calls import (construct_operation, get_client,
-                                             send_custom_json)
+from hive_rc_auto.helpers.hive_calls import (
+    construct_operation,
+    get_client,
+    send_custom_json,
+)
 
 os.environ["TESTNET"] = "false"
 hive_operation_id = "bol_testing"
@@ -47,7 +50,9 @@ async def test_send_custom_json():
     except RPCNodeException as ex:
         assert re.match(r".*missing required posting authority.*", ex.args[0])
 
-    client = get_client(nodes=["https://rpc.podping.org"], posting_keys=[Config.POSTING_KEY])
+    client = get_client(
+        nodes=["https://rpc.podping.org"], posting_keys=[Config.POSTING_KEY]
+    )
     try:
         trx = await send_custom_json(
             client=client,

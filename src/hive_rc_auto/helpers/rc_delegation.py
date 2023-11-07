@@ -10,8 +10,14 @@ from pymongo.errors import ServerSelectionTimeoutError
 
 from hive_rc_auto.helpers.config import Config
 from hive_rc_auto.helpers.hive_calls import (
-    HiveTrx, get_client, get_delegated_posting_auth_accounts, get_rcs,
-    get_tracking_accounts, make_lighthive_call, send_custom_json)
+    HiveTrx,
+    get_client,
+    get_delegated_posting_auth_accounts,
+    get_rcs,
+    get_tracking_accounts,
+    make_lighthive_call,
+    send_custom_json,
+)
 
 DB_NAME = "rc_podping"
 
@@ -457,7 +463,9 @@ class RCAllData(BaseModel):
         """
         payloads = []
         hive_operation_id = "rc"
-        client = get_client(nodes=["https://rpc.podping.org"], posting_keys=[Config.POSTING_KEY])
+        client = get_client(
+            nodes=["https://rpc.podping.org"], posting_keys=[Config.POSTING_KEY]
+        )
         different_delegators = {dd.acc_from for dd in self.pending_delegations}
         for delegator in different_delegators:
             payload = []
