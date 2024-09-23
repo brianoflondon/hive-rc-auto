@@ -1,5 +1,3 @@
-version: '3'
-
 services:
 
   rc_bot:
@@ -18,8 +16,8 @@ services:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "python bot.py"
     restart: unless-stopped
-    networks:
-      - hive-network
+    # networks:
+    #   - hive-network
 
 
   rc_dash:
@@ -42,21 +40,21 @@ services:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "streamlit run Podping.py"
     restart: unless-stopped
-    networks:
-      - hive-network
+    # networks:
+    #   - hive-network
 
-  pricefeed:
-    container_name: v4vapp-pricefeed
-    image: brianoflondon/v4vapphivepricefeed:latest
-    logging:
-      driver: "json-file"
-      options:
-          max-file: "5"
-          max-size: "10m"
-    env_file:
-      - ".env"
-    restart: unless-stopped
+  # pricefeed:
+  #   container_name: v4vapp-pricefeed
+  #   image: brianoflondon/v4vapphivepricefeed:latest
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #         max-file: "5"
+  #         max-size: "10m"
+  #   env_file:
+  #     - ".env"
+  #   restart: unless-stopped
 
-networks:
-  hive-network:
-    external: true
+# networks:
+#   hive-network:
+#     external: true
