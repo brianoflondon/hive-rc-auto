@@ -21,7 +21,7 @@ from hive_rc_auto.helpers.pingslurp_accounts import (
 
 ALL_MARKDOWN = import_text()
 
-DB_CONNECTION = os.getenv("DB_CONNECTION")
+DB_CONNECTION = os.getenv("PINGSLURP_DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
 
 

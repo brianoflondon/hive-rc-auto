@@ -16,6 +16,8 @@ services:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "python bot.py"
     restart: unless-stopped
+    networks:
+      - repl-mongo_default
     # networks:
     #   - hive-network
 
@@ -40,6 +42,12 @@ services:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "streamlit run Podping.py"
     restart: unless-stopped
+    networks:
+      - repl-mongo_default
+
+networks:
+  repl-mongo_default:
+    external: true
     # networks:
     #   - hive-network
 

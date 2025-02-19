@@ -14,7 +14,7 @@ from hive_rc_auto.helpers.markdown.static_text import import_text
 from hive_rc_auto.helpers.podcastindex import get_podcast_index_info
 
 ALL_MARKDOWN = import_text()
-DB_CONNECTION = os.getenv("DB_CONNECTION")
+DB_CONNECTION = os.getenv("PINGSLURP_DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
 
 st.set_page_config(

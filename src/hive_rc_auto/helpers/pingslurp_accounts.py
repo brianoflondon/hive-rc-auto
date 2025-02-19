@@ -6,7 +6,7 @@ import streamlit as st
 from pymongo import MongoClient
 from pymongo.command_cursor import CommandCursor
 
-DB_CONNECTION = os.getenv("DB_CONNECTION")
+DB_CONNECTION = os.getenv("PINGSLURP_DB_CONNECTION")
 CLIENT = MongoClient(DB_CONNECTION)
 TIME_FRAME = "hour"
 

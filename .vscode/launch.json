@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
@@ -14,7 +14,7 @@
         },
         {
             "name": "RC Bot",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/bot.py",
             "console": "integratedTerminal",
@@ -22,10 +22,11 @@
         },
         {
             "name": "Main Streamlit",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "streamlit",
             "cwd": "${workspaceFolder}/src/",
+            "envFile": "${workspaceFolder}/.env",
             "args": [
                 "run",
                 "Podping.py"
