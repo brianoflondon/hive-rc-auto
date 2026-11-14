@@ -3,20 +3,17 @@
 
 
 import hashlib
-import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from time import time
-from typing import Optional
+from typing import Any
 from uuid import UUID
 
 import httpx
 import requests
 
 # import xmltodict
-from pydantic import Field
-from pydantic.main import BaseModel
-from pydantic.networks import AnyUrl
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field, field_validator
 from requests import Response
 
 # setup some basic vars for the search api.
@@ -45,21 +42,51 @@ pod_index_info = {
 }
 
 
+def _coerce_utc_datetime(value: Any) -> Any:
+    """Podcast Index sends these timestamps as unix seconds."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, tz=UTC)
+    if isinstance(value, str) and value.strip().isdigit():
+        return datetime.fromtimestamp(int(value), tz=UTC)
+    return value
+
+
 class PodcastIndexInfo(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     feedID: int = Field(alias="id")
     guid: UUID = Field(alias="podcastGuid")
     podcast: str = Field(alias="title")
     url: AnyUrl
-    originalUrl: Optional[AnyUrl]
-    link: Optional[str]
-    description: Optional[str]
-    author: Optional[str]
-    ownerName: Optional[str]
-    image: Optional[str]
-    artwork: Optional[str]
+    originalUrl: AnyUrl | None = None
+    link: str | None = None
+    description: str | None = None
+    author: str | None = None
+    ownerName: str | None = None
+    image: str | None = None
+    artwork: str | None = None
     lastUpdateTime: datetime
     lastCrawlTime: datetime
     lastParseTime: datetime
+
+    @field_validator(
+        "originalUrl",
+        mode="before",
+    )
+    @classmethod
+    def empty_url_is_missing(cls, value: Any) -> Any:
+        if value == "":
+            return None
+        return value
+
+    @field_validator("lastUpdateTime", "lastCrawlTime", "lastParseTime", mode="before")
+    @classmethod
+    def parse_unix_time(cls, value: Any) -> Any:
+        return _coerce_utc_datetime(value)
 
 
 BASE_URL = "https://api.podcastindex.org/api/1.0/"
@@ -84,7 +111,7 @@ apiCalls = {
 async def get_podcast_index_info(url: AnyUrl) -> PodcastIndexInfo:
     """Fetch the podcastindex information for a podcast based on URL"""
     headers = get_headers()
-    url_to_call = BASE_URL + f"podcasts/byfeedurl"
+    url_to_call = BASE_URL + "podcasts/byfeedurl"
     params = {"url": url}
     async with httpx.AsyncClient() as client:
         # logging.info(f"Fetching PodcastIndex info for url: {url}")
@@ -92,7 +119,7 @@ async def get_podcast_index_info(url: AnyUrl) -> PodcastIndexInfo:
         if response.status_code == 200 and response.json()["status"] == "true":
             ans = response.json()["feed"]
             if ans:
-                return PodcastIndexInfo.parse_obj(ans)
+                return PodcastIndexInfo.model_validate(ans)
         return None
 
 

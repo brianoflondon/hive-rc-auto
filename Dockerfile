@@ -1,20 +1,24 @@
-FROM python:3.11
+FROM python:3.14-slim
 
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \
-    cd /usr/local/bin && \
-    ln -s /opt/poetry/bin/poetry && \
-    poetry config virtualenvs.create false
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /uvx /bin/
 
-# Copy using poetry.lock* in case it doesn't exist yet
-COPY ./pyproject.toml ./poetry.lock* /app/
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
 
-WORKDIR  /app/
+WORKDIR /tmp/project
 
-RUN poetry install --no-root --only main
+# Install third-party dependencies before the application code so this layer
+# stays cached when only the source changes.
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-dev --no-install-project
 
-COPY ./src /app/
+COPY src/hive_rc_auto ./src/hive_rc_auto
+RUN uv sync --frozen --no-dev --no-editable
 
-# EXPOSE 8505
-# ENTRYPOINT ["hive_rc_auto/bot.py"]
-# ENTRYPOINT ["streamlit", "run", "hive_rc_auto/main.py", "--server.port=8505", "--server.address=0.0.0.0"]
+# Compose runs `python bot.py` and `streamlit run Podping.py` from the workdir.
+# Those entrypoints, pages/, and the package live next to each other.
+WORKDIR /app
+COPY src/ /app/

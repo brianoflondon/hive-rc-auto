@@ -2,9 +2,9 @@ import json
 import logging
 import os
 import re
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from random import shuffle
-from typing import Any, Callable, List, Optional, Union
+from typing import Any
 
 import backoff
 import httpx
@@ -13,7 +13,7 @@ from lighthive.client import Client
 from lighthive.datastructures import Operation
 from lighthive.exceptions import RPCNodeException
 from lighthive.helpers.account import VOTING_MANA_REGENERATION_IN_SECONDS
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from hive_rc_auto.helpers.config import Config
 
@@ -21,6 +21,8 @@ Config.VOTING_MANA_REGENERATION_IN_SECONDS = VOTING_MANA_REGENERATION_IN_SECONDS
 
 
 class HiveTrx(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     trx_id: str = Field(alias="id")
     block_num: int
     trx_num: int
@@ -28,7 +30,7 @@ class HiveTrx(BaseModel):
 
 
 def get_client(
-    posting_keys: Optional[List[str]] = None,
+    posting_keys: list[str] | None = None,
     nodes=None,
     connect_timeout=3,
     read_timeout=30,
@@ -79,7 +81,7 @@ def get_client(
 
 def get_delegated_posting_auth_accounts(
     primary_account=Config.PRIMARY_ACCOUNT,
-) -> List[str]:
+) -> list[str]:
     """
     Return a list of all accounts which have delegated posting authority
     to the primary account. These accounts can be used to draw RC's from
@@ -88,10 +90,7 @@ def get_delegated_posting_auth_accounts(
     The primary account is added to the start of the list
     """
     try:
-        SQLCommand = (
-            f"SELECT name FROM Accounts WHERE posting LIKE "
-            f"'%\"{primary_account}\"%'"
-        )
+        SQLCommand = f"SELECT name FROM Accounts WHERE posting LIKE '%\"{primary_account}\"%'"
         result = hive_sql(SQLCommand, 100)
 
     except pymssql.OperationalError as e:
@@ -126,7 +125,7 @@ def hive_sql(SQLCommand, limit):
 
 def get_tracking_accounts(
     primary_account: str = Config.PRIMARY_ACCOUNT, client: Client = None
-) -> List[str]:
+) -> list[str]:
     """
     Get a list of all accounts allowed to post by the primary account
     and only react to these accounts. Always returns the primary account
@@ -148,7 +147,7 @@ def get_tracking_accounts(
     return make_lighthive_call(client=client, call_to_make=hive_acc.following)
 
 
-def get_rcs(check_accounts: List[str]) -> dict:
+def get_rcs(check_accounts: list[str]) -> dict:
     """ "
     Calls hive with the `find_rc_accounts` method
     """
@@ -177,12 +176,10 @@ def price_feed_update_needed(base: float) -> bool:
                 quote_timediff = timedelta(
                     seconds=int(datetime.utcnow().timestamp() - prev_timestamp)
                 )
-                if abs(per_diff) < 0.02 and quote_timediff.total_seconds() < (
-                    12 * 3600
-                ):
+                if abs(per_diff) < 0.02 and quote_timediff.total_seconds() < (12 * 3600):
                     logging.info(
                         f"Price feed un-changed | Base: {base:.3f} | "
-                        f"Change: {per_diff*100:.1f} % | "
+                        f"Change: {per_diff * 100:.1f} % | "
                         f"Age: {quote_timediff}"
                     )
                     return False
@@ -213,9 +210,7 @@ async def publish_feed(publisher: str = "brianoflondon") -> bool:
                 trx = client.broadcast_sync(op=op, dry_run=False)
                 logging.info(f"Price feed published: {trx}")
                 with open("price_feed.json", "w") as f:
-                    json.dump(
-                        {"base": base, "timestamp": datetime.utcnow().timestamp()}, f
-                    )
+                    json.dump({"base": base, "timestamp": datetime.utcnow().timestamp()}, f)
         return True
 
     except Exception as ex:
@@ -277,7 +272,7 @@ async def send_custom_json(
     hive_operation_id: str,
     required_auth: str = None,
     required_posting_auth: str = None,
-) -> Union[None, HiveTrx]:
+) -> None | HiveTrx:
     """Build and send an operation to the blockchain"""
     try:
         trx = None
@@ -295,7 +290,7 @@ async def send_custom_json(
         logging.info(f"https://hiveblocks.com/tx/{trx.get('id')}")
         logging.info(payload)
         if trx:
-            return HiveTrx.parse_obj(trx)
+            return HiveTrx.model_validate(trx)
 
     except RPCNodeException as ex:
         logging.error(f"send_custom_json error: {ex}")
@@ -318,7 +313,7 @@ async def send_custom_json(
                 raise ex
             else:
                 raise ex
-        except (KeyError, AttributeError):
+        except KeyError, AttributeError:
             logging.error(f"{ex}")
             logging.info("Non standard error message from RPC Node")
             raise ex

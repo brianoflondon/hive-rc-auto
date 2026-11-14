@@ -1,9 +1,8 @@
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from itertools import cycle
 from timeit import default_timer as timer
-from typing import Tuple
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -19,6 +18,11 @@ from hive_rc_auto.helpers.pingslurp_accounts import (
 from hive_rc_auto.helpers.rc_delegation import RCAccount
 
 ALL_MARKDOWN = import_text()
+
+
+def naive_utcnow() -> datetime:
+    """Naive UTC, matching PyMongo's default tz_aware=False datetimes."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def rc_guage(rc: RCAccount):
@@ -78,22 +82,17 @@ def build_rc_graph(
     )
     if st.session_state.show_size:
         if not df_size.empty:
-            df_size["age_hours"] = (
-                datetime.utcnow() - df_size.index
-            ).total_seconds() / 3600
+            df_size["age_hours"] = (naive_utcnow() - df_size.index).total_seconds() / 3600
             df_size_a = df_size[df_size.account == hive_acc]
             if not df_size_a.empty:
                 fig.update_yaxes(title_text="<b>Bytes/min</b>", secondary_y=False)
                 fig.add_trace(
                     go.Scatter(
                         x=df_size_a.age_hours,
-                        y=df_size_a["total_size"]
-                        .rolling("4H", closed="neither")
-                        .mean(),
+                        y=df_size_a["total_size"].rolling("4h", closed="neither").mean(),
                         name="Bytes/min",
                         text=[f"{ts:%d %H:%M}" for ts in df_size_a.index],
-                        hovertemplate="-%{x:.1f} hours<br>%{text}"
-                        + "<br>%{y:,.0f} bytes",
+                        hovertemplate="-%{x:.1f} hours<br>%{text}" + "<br>%{y:,.0f} bytes",
                         line=dict(color="lightgreen"),
                     ),
                     secondary_y=False,
@@ -152,49 +151,51 @@ def build_rc_graph(
     fig.update_layout(margin={"autoexpand": True, "b": 0, "t": 0, "l": 0, "r": 0})
     fig.update_xaxes(autorange="reversed")
     # fig.show()
-    logging.info(f"Time to build graph {hive_acc} - {timer()-start:.4f}s")
+    logging.info(f"Time to build graph {hive_acc} - {timer() - start:.4f}s")
     return fig
 
 
-def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
+def get_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     # Fetch data from Mongodb returns two dataframes:
     # df -> main data of rc levels
     # df_rc_changes -> data for changes.
-    DB_CONNECTION = os.getenv("DB_CONNECTION")
-    CLIENT = MongoClient(DB_CONNECTION)
+    CLIENT = MongoClient(Config.DB_CONNECTION)
     db_rc_ts = CLIENT["rc_podping"][Config.DB_NAME]
 
     if st.session_state.hours == "All":
         time_limit = timedelta(weeks=4)
     else:
         time_limit = timedelta(hours=st.session_state.hours)
-    earliest_data = datetime.utcnow() - time_limit
+    earliest_data = naive_utcnow() - time_limit
 
     result = db_rc_ts.find(
         {"real_mana": {"$ne": None}, "timestamp": {"$gte": earliest_data}}, {"_id": 0}
     )
 
     df = pd.DataFrame(result)
-    if not df.empty:
-        df["age"] = datetime.utcnow() - df.timestamp
-        df.set_index("timestamp", inplace=True)
-        df["age_hours"] = df["age"].dt.total_seconds() / 3600
-
-        db_rc_ts_deleg = CLIENT["rc_podping"][Config.DB_NAME_DELEG]
-        result2 = db_rc_ts_deleg.find(
-            {"timestamp": {"$gte": earliest_data}}, {"_id": 0}
-        )
-
-        df_rc_changes = pd.DataFrame(result2)
-        if not df_rc_changes.empty:
-            df_rc_changes["age"] = datetime.utcnow() - df_rc_changes.timestamp
-            df_rc_changes.set_index("timestamp", inplace=True)
-            df_rc_changes["age_hours"] = df_rc_changes["age"].dt.total_seconds() / 3600
-
+    if df.empty:
+        empty_changes = pd.DataFrame()
         st.session_state.df = df
-        st.session_state.df_rc_changes = df_rc_changes
+        st.session_state.df_rc_changes = empty_changes
+        return df, empty_changes
 
-        return df, df_rc_changes
+    df["age"] = naive_utcnow() - df.timestamp
+    df = df.set_index("timestamp")
+    df["age_hours"] = df["age"].dt.total_seconds() / 3600
+
+    db_rc_ts_deleg = CLIENT["rc_podping"][Config.DB_NAME_DELEG]
+    result2 = db_rc_ts_deleg.find({"timestamp": {"$gte": earliest_data}}, {"_id": 0})
+
+    df_rc_changes = pd.DataFrame(result2)
+    if not df_rc_changes.empty:
+        df_rc_changes["age"] = naive_utcnow() - df_rc_changes.timestamp
+        df_rc_changes = df_rc_changes.set_index("timestamp")
+        df_rc_changes["age_hours"] = df_rc_changes["age"].dt.total_seconds() / 3600
+
+    st.session_state.df = df
+    st.session_state.df_rc_changes = df_rc_changes
+
+    return df, df_rc_changes
 
 
 def hours_selectbox():
@@ -222,12 +223,13 @@ def size_selectbox():
 def grid(ncol: int = 2):
 
     df, df_rc_changes = get_data()
+    if df.empty:
+        st.warning("No RC history in this time window.")
+        return
     hours = st.session_state.hours
     if hours == "All":
-        hours = int(4 * 24 * 7 * 4)
-    time_range = {
-        "$match": {"timestamp": {"$gt": datetime.utcnow() - timedelta(hours=hours)}}
-    }
+        hours = 4 * 24 * 7 * 4
+    time_range = {"$match": {"timestamp": {"$gt": naive_utcnow() - timedelta(hours=hours)}}}
     livetest_filter = {"$match": {}}
 
     df_size = dataframe_all_transactions_by_account(
@@ -241,9 +243,7 @@ def grid(ncol: int = 2):
 
     for hive_acc in all_accounts:
         dfa = df[df.account == hive_acc]
-        if dfa.real_mana_percent.iloc[-1] < 95 and (
-            not dfa.delegating.iloc[-1] == "delegating"
-        ):
+        if dfa.real_mana_percent.iloc[-1] < 95 and (not dfa.delegating.iloc[-1] == "delegating"):
             filtered_accounts.append(hive_acc)
 
     st.subheader("Delegating Accounts")
@@ -254,9 +254,7 @@ def grid(ncol: int = 2):
     ):
         col = cols[i % ncol]
         dfa = df[df.account == hive_acc]
-        col.plotly_chart(
-            build_rc_graph(df, df_rc_changes, hive_acc), use_container_width=True
-        )
+        col.plotly_chart(build_rc_graph(df, df_rc_changes, hive_acc), width="stretch")
     st.subheader("Receiving Accounts")
     cols2 = st.columns(ncol)
     for i, hive_acc in zip(
@@ -267,7 +265,7 @@ def grid(ncol: int = 2):
         dfa = df[df.account == hive_acc]
         col.plotly_chart(
             build_rc_graph(df, df_rc_changes, hive_acc, df_size),
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -307,12 +305,10 @@ if __name__ == "__main__":
     main_loop()
 
     df = st.session_state.df_rc_changes
-    df.sort_values(by="age", ascending=True, inplace=True)
     if not df.empty:
-        df["link"] = f"[Link](https://hive.ausbit.dev/tx/" + df["trx_id"] + ")"
-        df = df.drop(
-            ["deleg", "age", "trx_num", "trx_id", "block_num", "account"], axis=1
-        )
+        df = df.sort_values(by="age", ascending=True)
+        df["link"] = "[Link](https://hive.ausbit.dev/tx/" + df["trx_id"] + ")"
+        df = df.drop(["deleg", "age", "trx_num", "trx_id", "block_num", "account"], axis=1)
         mkd = df.to_markdown()
         st.markdown(mkd)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width="stretch")

@@ -1,11 +1,12 @@
 import logging
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, List, Tuple, Union
+from typing import Any
 
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
-from pydantic import BaseModel, Field
-from pymongo import MongoClient
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pymongo import AsyncMongoClient, MongoClient
+from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import ServerSelectionTimeoutError
 
 from hive_rc_auto.helpers.config import Config
@@ -22,9 +23,9 @@ from hive_rc_auto.helpers.hive_calls import (
 DB_NAME = "rc_podping"
 
 
-def get_mongo_db(collection: str) -> AsyncIOMotorCollection:
+def get_mongo_db(collection: str) -> AsyncCollection:
     """Returns the MongoDB"""
-    return AsyncIOMotorClient(Config.DB_CONNECTION)[DB_NAME][collection]
+    return AsyncMongoClient(Config.DB_CONNECTION)[DB_NAME][collection]
 
 
 def setup_mongo_db() -> int:
@@ -62,7 +63,20 @@ def check_setup_db(db_name: str) -> bool:
 
 
 def get_utc_now_timestamp() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
+
+
+def coerce_utc_datetime(value: Any) -> Any:
+    """Hive RC manabar timestamps are unix seconds."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, tz=UTC)
+    if isinstance(value, str) and value.strip().isdigit():
+        return datetime.fromtimestamp(int(value), tz=UTC)
+    return value
 
 
 class RCStatus(str, Enum):
@@ -91,6 +105,11 @@ class RCManabar(BaseModel):
     current_mana: int
     last_update_time: datetime
 
+    @field_validator("last_update_time", mode="before")
+    @classmethod
+    def parse_last_update_time(cls, value: Any) -> Any:
+        return coerce_utc_datetime(value)
+
 
 class RCCreationAdjustment(BaseModel):
     amount: int
@@ -103,21 +122,23 @@ class RCCreationAdjustment(BaseModel):
 
 
 class RCDirectDelegation(BaseModel):
-    acc_from: str = Field(None, alias="from")
-    acc_to: str = Field(None, alias="to")
+    model_config = ConfigDict(populate_by_name=True)
+
+    acc_from: str | None = Field(default=None, alias="from")
+    acc_to: str | None = Field(default=None, alias="to")
     delegated_rc: int = 0
-    cut: bool = None
+    cut: bool | None = None
 
     def db_format(self, trx: HiveTrx) -> dict:
         ans = {}
         ans["timestamp"] = get_utc_now_timestamp()
         ans["deleg"] = {"acc_from": self.acc_from, "acc_to": self.acc_to}
         ans["account"] = self.acc_to
-        ans = ans | self.dict() | trx.dict()
+        ans = ans | self.model_dump() | trx.model_dump()
         return ans
 
     @property
-    def payload_item(self) -> List[str | dict[str, str | list[str] | int]]:
+    def payload_item(self) -> list[str | dict[str, str | list[str] | int]]:
         return [
             "delegate_rc",
             {
@@ -146,14 +167,16 @@ class RCDirectDelegation(BaseModel):
 
 
 class RCAccount(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     timestamp: datetime = Field(
         default_factory=get_utc_now_timestamp,
         title="Timestamp",
         description="Timestamp of RC reading.",
     )
-    account: str = Field(None, title="Account Name")
+    account: str | None = Field(default=None, title="Account Name")
     delegating: RCAccType = Field(
-        RCAccType.TARGET,
+        default=RCAccType.TARGET,
         title="Delegating",
         description="Delegating account or target account",
     )
@@ -162,95 +185,81 @@ class RCAccount(BaseModel):
     max_rc: int = Field(title="RC Max")
     delegated_rc: int = Field(title="Out Deleg")
     received_delegated_rc: int = Field(title="Recv Deleg")
-    real_mana: int = Field(
-        0,
+    real_mana: float = Field(
+        default=0,
         title="Current RC",
         description="Current RC Mana after allowing for regeneration.",
     )
     real_mana_percent: float = Field(
-        0.0,
+        default=0.0,
         title="RC Now",
         description="Current RC Mana Percentage after allowing for regeneration.",
     )
     delta_percent: float = Field(
-        0.0, title="RC Dt", description="RC Delta extrapolated out for 1 hour"
+        default=0.0, title="RC Dt", description="RC Delta extrapolated out for 1 hour"
     )
-    rc_deleg_available: int = Field(
-        0,
+    rc_deleg_available: float = Field(
+        default=0,
         title="RC Dl Avail",
         description="Current RC this account can delegate.",
     )
     old_mana_percent: float = Field(
-        0.0, title="RC Last", description="Previous RC Mana Percentage."
+        default=0.0, title="RC Last", description="Previous RC Mana Percentage."
     )
-    status: RCStatus = 0
-    alarm_set: bool = Field(
-        False, title="Alarm", description="Flag for raising an alarm."
-    )
-    deleg_out: List[RCDirectDelegation] = Field(
-        [],
+    status: RCStatus = RCStatus.OK
+    alarm_set: bool = Field(default=False, title="Alarm", description="Flag for raising an alarm.")
+    deleg_out: list[RCDirectDelegation] = Field(
+        default_factory=list,
         title="Delegations made",
         description="Outgoing delegations from this account",
     )
-    deleg_recv: List[Any] = Field(
-        [],
+    deleg_recv: list[Any] = Field(
+        default_factory=list,
         title="Delegations made",
         description="Outgoing delegations from this account",
     )
 
-    def __init__(__pydantic_self__, **data: Any) -> None:
-        super().__init__(**data)
-        if data.get("deleg_out"):
-            # Handle correct transfer of mutable strings
-            __pydantic_self__.deleg_out = data["deleg_out"].copy()
+    def model_post_init(self, context: Any) -> None:
+        if self.deleg_out:
+            self.deleg_out = list(self.deleg_out)
 
-        # Calculate real_mana (RC) as a percentage allowing for regeneration
-        last_mana = __pydantic_self__.rc_manabar.current_mana
-        max_mana = __pydantic_self__.max_rc
-        updated_at = __pydantic_self__.rc_manabar.last_update_time
-        time_since_last = datetime.now(timezone.utc) - updated_at
+        # Calculate real_mana (RC) as a percentage allowing for regeneration.
+        # model_validate does not call a custom __init__, so this lives here.
+        last_mana = self.rc_manabar.current_mana
+        max_mana = self.max_rc
+        updated_at = self.rc_manabar.last_update_time
+        time_since_last = datetime.now(UTC) - updated_at
         regenerated_mana = (
-            time_since_last.total_seconds()
-            * max_mana
-            / Config.VOTING_MANA_REGENERATION_IN_SECONDS
+            time_since_last.total_seconds() * max_mana / Config.VOTING_MANA_REGENERATION_IN_SECONDS
         )
-        __pydantic_self__.real_mana = last_mana + regenerated_mana
-        real_mana_percent = __pydantic_self__.real_mana * 100 / max_mana
-        __pydantic_self__.real_mana_percent = (
-            100.0 if real_mana_percent > 100 else real_mana_percent
-        )
-        # Filter for too_high and too_low
+        self.real_mana = last_mana + regenerated_mana
+        real_mana_percent = self.real_mana * 100 / max_mana
+        self.real_mana_percent = 100.0 if real_mana_percent > 100 else real_mana_percent
         if (
-            not __pydantic_self__.account in Config.DELEGATING_ACCOUNTS
-            and __pydantic_self__.received_delegated_rc
+            self.account not in Config.DELEGATING_ACCOUNTS
+            and self.received_delegated_rc
             and real_mana_percent > Config.RC_PCT_UPPER_TARGET
         ):
-            __pydantic_self__.status = RCStatus.HIGH
+            self.status = RCStatus.HIGH
         elif real_mana_percent < Config.RC_PCT_LOWER_TARGET:
-            __pydantic_self__.status = RCStatus.LOW
+            self.status = RCStatus.LOW
         else:
-            __pydantic_self__.status = RCStatus.OK
+            self.status = RCStatus.OK
 
-        __pydantic_self__.delta_percent = (
-            (__pydantic_self__.real_mana_percent - __pydantic_self__.old_mana_percent)
-            if __pydantic_self__.old_mana_percent != 0.0
+        self.delta_percent = (
+            (self.real_mana_percent - self.old_mana_percent)
+            if self.old_mana_percent != 0.0
             else 0.0
         )
         # Extrapolate RC Delta to 1 hour
-        __pydantic_self__.delta_percent *= 3600 / Config.UPDATE_FREQUENCY_SECS
+        self.delta_percent *= 3600 / Config.UPDATE_FREQUENCY_SECS
 
-        if (
-            __pydantic_self__.real_mana_percent + __pydantic_self__.delta_percent
-            < Config.RC_PCT_ALARM_LEVEL
-        ):
-            __pydantic_self__.alarm_set = True
+        if self.real_mana_percent + self.delta_percent < Config.RC_PCT_ALARM_LEVEL:
+            self.alarm_set = True
 
-        __pydantic_self__.rc_deleg_available = __pydantic_self__.real_mana - (
-            Config.RC_BASE_LEVEL + __pydantic_self__.received_delegated_rc
+        self.rc_deleg_available = self.real_mana - (
+            Config.RC_BASE_LEVEL + self.received_delegated_rc
         )
-
-    class Config:
-        use_enum_values = True  # <--
 
     @property
     def delta_icon(self) -> str:
@@ -289,26 +298,26 @@ class RCAccount(BaseModel):
             return new_amount
         if self.status == RCStatus.HIGH and self.delta_percent > 0:
             percent_gap = (self.real_mana_percent - Config.RC_PCT_UPPER_TARGET) + 2
-            delta = -(self.max_rc * (((percent_gap) / 100))) * 1.3
+            delta = -(self.max_rc * ((percent_gap) / 100)) * 1.3
             return delta
         return 0
 
     @property
     def db_format(self) -> dict:
         """Return fields to stor in the database"""
-        data = self.dict(
+        data = self.model_dump(
             include={
-                "timestamp": True,
-                "account": True,
-                "delegating": True,
-                "status": True,
-                "max_rc": True,
-                "delegated_rc": True,
-                "received_delegated_rc": True,
-                "real_mana": True,
-                "real_mana_percent": True,
-                "delta_percent": True,
-                "rc_deleg_available": True,
+                "timestamp",
+                "account",
+                "delegating",
+                "status",
+                "max_rc",
+                "delegated_rc",
+                "received_delegated_rc",
+                "real_mana",
+                "real_mana_percent",
+                "delta_percent",
+                "rc_deleg_available",
             }
         )
         data["delta_icon"] = self.delta_icon
@@ -341,65 +350,63 @@ class RCAccount(BaseModel):
 
     @classmethod
     def log_line_header(cls, logger: Callable):
+        fields = cls.model_fields
         logger("-" * 50)
         logger(
-            f"{cls.__fields__['account'].field_info.title:<16} |    | "
-            f"{cls.__fields__['real_mana_percent'].field_info.title:>6} %| "
-            f"{cls.__fields__['delta_percent'].field_info.title:>8} %| "
-            f"{cls.__fields__['real_mana'].field_info.title:>12} M |"
-            # f"{cls.__fields__['max_rc'].field_info.title:>12} M | "
-            f"{cls.__fields__['delegated_rc'].field_info.title:>12} M |"
-            f"{cls.__fields__['received_delegated_rc'].field_info.title:>12} M |"
-            # f"{cls.__fields__['rc_deleg_available'].field_info.title:>12} M |"
+            f"{fields['account'].title:<16} |    | "
+            f"{fields['real_mana_percent'].title:>6} %| "
+            f"{fields['delta_percent'].title:>8} %| "
+            f"{fields['real_mana'].title:>12} M |"
+            # f"{fields['max_rc'].title:>12} M | "
+            f"{fields['delegated_rc'].title:>12} M |"
+            f"{fields['received_delegated_rc'].title:>12} M |"
+            # f"{fields['rc_deleg_available'].title:>12} M |"
         )
 
 
 class RCListOfAccounts(BaseModel):
-    all: List[str] = []
-    delegating: List[str] = []
-    receiving: List[str] = []
+    all: list[str] = Field(default_factory=list)
+    delegating: list[str] = Field(default_factory=list)
+    receiving: list[str] = Field(default_factory=list)
 
-    def __init__(__pydantic_self__, primary_account=Config.PRIMARY_ACCOUNT) -> None:
+    def model_post_init(self, context: Any) -> None:
         # Slow and expensive operation. Run on startup and rarely.
-        super().__init__()
-        __pydantic_self__.delegating = get_delegated_posting_auth_accounts(
-            primary_account
-        )
-        __pydantic_self__.receiving = get_tracking_accounts(primary_account)
-        __pydantic_self__.all = list(
-            set(__pydantic_self__.delegating + __pydantic_self__.receiving)
-        )
+        # Skip when the lists were supplied already, so nesting this model
+        # inside RCAllData does not query Hive again.
+        if self.all or self.delegating or self.receiving:
+            return
+        primary_account = Config.PRIMARY_ACCOUNT
+        self.delegating = get_delegated_posting_auth_accounts(primary_account)
+        self.receiving = get_tracking_accounts(primary_account)
+        self.all = list(set(self.delegating + self.receiving))
 
 
 class RCAllData(BaseModel):
-
     timestamp: datetime = Field(
-        default=datetime.now(timezone.utc),
+        default_factory=get_utc_now_timestamp,
         title="Timestamp",
         description="Timestamp of All readings.",
     )
-    rcs: List[RCAccount] = Field(
-        [], title="All RC Accounts", description="All the tracked accounts RC details"
+    rcs: list[RCAccount] = Field(
+        default_factory=list,
+        title="All RC Accounts",
+        description="All the tracked accounts RC details",
     )
     accounts: RCListOfAccounts
-    pending_delegations: List[RCDirectDelegation] = Field(
-        [], title="List of pending delegations"
+    pending_delegations: list[RCDirectDelegation] = Field(
+        default_factory=list, title="List of pending delegations"
     )
-
-    def __init__(__pydantic_self__, **data: Any) -> None:
-        super().__init__(**data)
 
     def pending_delegations_by(self, delegator: str) -> int:
         """Return just the pending delegations for a specific delgator account"""
         return int(sum([dd.delegated_rc for dd in self.pending_delegations]))
 
-    async def fill_data(self, old_all_rcs: List[RCAccount] = None):
+    async def fill_data(self, old_all_rcs: list[RCAccount] = None):
         """
         Fills in the data
         """
-        self.timestamp = datetime.now(timezone.utc)
+        self.timestamp = datetime.now(UTC)
         self.rcs = await get_rc_of_accounts(self.accounts, old_all_rcs=old_all_rcs)
-        pass
 
     async def update_delegations(self):
         """
@@ -408,10 +415,7 @@ class RCAllData(BaseModel):
         new_delegations = []
         if self.rcs:
             for rc in self.rcs:
-                if (
-                    rc.account in self.accounts.receiving
-                    and not rc.status == RCStatus.OK
-                ):
+                if rc.account in self.accounts.receiving and not rc.status == RCStatus.OK:
                     new_amount = rc.calculate_new_delegation()
                     new_delegations.append((rc.account, new_amount))
                     logging.debug(f"Delegate {mill_s(new_amount)} to {rc.account:>16}")
@@ -422,56 +426,42 @@ class RCAllData(BaseModel):
                     delegate_from = await self.which_account_to_delegate_from(
                         deleg[0], amount=deleg[1]
                     )
-                    new_dd = RCDirectDelegation.parse_obj(
-                        {
-                            "from": delegate_from,
-                            "to": deleg[0],
-                            "delegated_rc": deleg[1],
-                            "cut": False,
-                        }
-                    )
+                    new_dd = RCDirectDelegation.model_validate({
+                        "from": delegate_from,
+                        "to": deleg[0],
+                        "delegated_rc": deleg[1],
+                        "cut": False,
+                    })
                     self.pending_delegations.append(new_dd)
                     logging.debug(f"Deleg from {delegate_from} {deleg[0]} {deleg[1]}")
                 elif deleg[1] < 0:
                     (
                         cut_delegate_from,
                         new_amount,
-                    ) = await self.which_account_to_cut_delegation_from(
-                        deleg[0], amount=deleg[1]
-                    )
+                    ) = await self.which_account_to_cut_delegation_from(deleg[0], amount=deleg[1])
                     if not cut_delegate_from == "external_delegation":
                         # This account has a delegation we can coontrol Podping
-                        new_dd = RCDirectDelegation.parse_obj(
-                            {
-                                "from": cut_delegate_from,
-                                "to": deleg[0],
-                                "delegated_rc": new_amount,
-                                "cut": True,
-                            }
-                        )
+                        new_dd = RCDirectDelegation.model_validate({
+                            "from": cut_delegate_from,
+                            "to": deleg[0],
+                            "delegated_rc": new_amount,
+                            "cut": True,
+                        })
                         self.pending_delegations.append(new_dd)
-                        logging.debug(
-                            f"Cut Deleg from {cut_delegate_from} {deleg[0]} {deleg[1]}"
-                        )
+                        logging.debug(f"Cut Deleg from {cut_delegate_from} {deleg[0]} {deleg[1]}")
 
-    async def get_payload_for_pending_delegations(
-        self, send_json: bool = False
-    ) -> List:
+    async def get_payload_for_pending_delegations(self, send_json: bool = False) -> list:
         """
         Sorts through the pending delegations and returns separate payloads
         one for each delegator. If send_json is True, send the jsons
         """
         payloads = []
         hive_operation_id = "rc"
-        client = get_client(
-            nodes=["https://rpc.podping.org"], posting_keys=[Config.POSTING_KEY]
-        )
+        client = get_client(nodes=["https://rpc.podping.org"], posting_keys=[Config.POSTING_KEY])
         different_delegators = {dd.acc_from for dd in self.pending_delegations}
         for delegator in different_delegators:
             payload = []
-            for dd in [
-                dd for dd in self.pending_delegations if dd.acc_from == delegator
-            ]:
+            for dd in [dd for dd in self.pending_delegations if dd.acc_from == delegator]:
                 # Each item in payload must be a list with one item in it
                 payload += [dd.payload_item]
             payloads.append(payload)
@@ -486,9 +476,9 @@ class RCAllData(BaseModel):
                     if trx:
                         logging.info(f"Custom Json: {trx.trx_num}")
                         db_delegations = get_mongo_db(Config.DB_NAME_DELEG)
-                        await db_delegations.insert_many(
-                            [pd.db_format(trx=trx) for pd in self.pending_delegations]
-                        )
+                        await db_delegations.insert_many([
+                            pd.db_format(trx=trx) for pd in self.pending_delegations
+                        ])
                 except Exception as ex:
                     logging.error(ex)
         return payloads
@@ -505,11 +495,7 @@ class RCAllData(BaseModel):
                 if rc.delegating == RCAccType.DELEGATING
             ]
             logger("-------- Targets             -----------")
-            [
-                rc.log_line_output(logger)
-                for rc in self.rcs
-                if rc.delegating == RCAccType.TARGET
-            ]
+            [rc.log_line_output(logger) for rc in self.rcs if rc.delegating == RCAccType.TARGET]
         if self.pending_delegations:
             logger("-------- Pending delegations  -----------")
             [dd.log_line_output(logger) for dd in self.pending_delegations]
@@ -517,7 +503,7 @@ class RCAllData(BaseModel):
     def _get_rcs(self, account: str) -> RCAccount:
         return [rc for rc in self.rcs if rc.account == account][0]
 
-    def _get_inbound_delegations(self, account: str) -> List[RCDirectDelegation]:
+    def _get_inbound_delegations(self, account: str) -> list[RCDirectDelegation]:
         dd_all = []
         for acc in self.accounts.delegating:
             rc = self._get_rcs(acc)
@@ -538,14 +524,12 @@ class RCAllData(BaseModel):
         for delegator in self.accounts.delegating:
             dd_from = [dd for dd in dd_list if dd.acc_from == delegator]
             if dd_from:
-                amount -= dd_from[0].delegated_rc - self.pending_delegations_by(
-                    delegator
-                )
+                amount -= dd_from[0].delegated_rc - self.pending_delegations_by(delegator)
             rc_real_mana = self._get_rcs(delegator).real_mana
             logging.debug(
                 f"Checking: {delegator:<16} | "
                 f"{mill_s(rc_real_mana)} - {mill_s(amount)} "
-                f"= {mill_s(rc_real_mana-amount)}"
+                f"= {mill_s(rc_real_mana - amount)}"
             )
             if self._get_rcs(delegator).real_mana > amount:
                 return delegator
@@ -554,7 +538,7 @@ class RCAllData(BaseModel):
 
     async def which_account_to_cut_delegation_from(
         self, target: str, amount: int
-    ) -> Union[Tuple[str, int], None]:
+    ) -> tuple[str, int] | None:
         """Which delegating account can we reduce delegation from to drop delegation
         by the target amount"""
         rc = self._get_rcs(target)
@@ -590,8 +574,8 @@ class RCAllData(BaseModel):
 
 
 async def get_rc_of_accounts(
-    check_accounts: RCListOfAccounts, old_all_rcs: List[RCAccount] = None
-) -> List[RCAccount]:
+    check_accounts: RCListOfAccounts, old_all_rcs: list[RCAccount] = None
+) -> list[RCAccount]:
     """
     Performs the lookup and fills in the RC data for all accounts
     """
@@ -600,7 +584,7 @@ async def get_rc_of_accounts(
     old_current_percents = (
         {i.account: i.real_mana_percent for i in old_all_rcs} if old_all_rcs else None
     )
-    ans: List[RCAccount] = []
+    ans: list[RCAccount] = []
     if rc_accounts := response.get("rc_accounts"):
         for a in rc_accounts:
             if old_current_percents:  # and old_current_percents[a.get("account")]:
@@ -614,13 +598,13 @@ async def get_rc_of_accounts(
                 a["delegating"] = RCAccType.DELEGATING
             else:
                 a["delegating"] = RCAccType.TARGET
-            ans.append(RCAccount.parse_obj(a))
+            ans.append(RCAccount.model_validate(a))
     return ans
 
 
 async def list_rc_direct_delegations(
     acc_from: str, acc_to: str = "", limit: int = 100
-) -> List[RCDirectDelegation]:
+) -> list[RCDirectDelegation]:
     """
     Returns all RC Delegations from this account optionaly to the second
     one. If you want a delegation from one account to another only, set limit =1
@@ -635,8 +619,7 @@ async def list_rc_direct_delegations(
     )
     if response.get("rc_direct_delegations"):
         ans = [
-            RCDirectDelegation.parse_obj(res)
-            for res in response.get("rc_direct_delegations")
+            RCDirectDelegation.model_validate(res) for res in response.get("rc_direct_delegations")
         ]
         return ans
     return []
