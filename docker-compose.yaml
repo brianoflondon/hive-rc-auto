@@ -18,6 +18,11 @@ services:
     restart: unless-stopped
     networks:
       - repl-mongo_default
+    extra_hosts:
+      - "gad-v4vapp.tail400e5.ts.net:100.85.133.47"
+      - "dave-v4vapp.tail400e5.ts.net:100.102.211.2"
+      - "edi-v4vapp.tail400e5.ts.net:100.107.241.103"
+      - "adam-v4vapp.tail400e5.ts.net:100.125.51.61"
     # networks:
     #   - hive-network
 
@@ -42,8 +47,12 @@ services:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
     command: bash -c "streamlit run Podping.py"
     restart: unless-stopped
-    networks:
-      - repl-mongo_default
+    network_mode: host
+    extra_hosts:
+      - "gad-v4vapp.tail400e5.ts.net:100.85.133.47"
+      - "dave-v4vapp.tail400e5.ts.net:100.102.211.2"
+      - "edi-v4vapp.tail400e5.ts.net:100.107.241.103"
+      - "adam-v4vapp.tail400e5.ts.net:100.125.51.61"
 
 networks:
   repl-mongo_default:
