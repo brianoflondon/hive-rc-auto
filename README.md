@@ -34,4 +34,21 @@ uv sync --group notebooks
 
 ## Docker
 
-`docker compose build` builds both services from `python:3.14-slim`. The image workdir is `/app`, with `bot.py` and `Podping.py` on the path, matching the compose commands. There is no GitHub Actions workflow in this repo; image rebuilds still come from whatever is watching the Dockerfile (Docker Hub's GitHub integration, historically).
+GitHub Actions builds `brianoflondon/hive-rc-auto` for `linux/amd64` and pushes it to Docker Hub on pushes to `main` and `develop`, on version tags, and when the workflow is run by hand. The image tag is the branch name (`main`, `develop`).
+
+On a server, pull this repo and start the published image. Compose does not build locally. `IMAGE_TAG` in `.env` selects the tag and defaults to `main`.
+
+```bash
+git pull
+docker compose pull
+docker compose up -d
+```
+
+The image workdir is `/app`, with `bot.py` and `Podping.py` on the path, so the compose commands stay `python bot.py` and `streamlit run Podping.py`. `.env` is not baked into the image. Compose injects it at runtime.
+
+To build the image on this machine instead:
+
+```bash
+docker build -t brianoflondon/hive-rc-auto:dev .
+IMAGE_TAG=dev docker compose up -d
+```

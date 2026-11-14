@@ -2,9 +2,7 @@ services:
 
   rc_bot:
     container_name: rc_bot
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: brianoflondon/hive-rc-auto:${IMAGE_TAG:-main}
     logging:
       driver: "json-file"
       options:
@@ -29,9 +27,7 @@ services:
 
   rc_dash:
     container_name: rc_dash
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: brianoflondon/hive-rc-auto:${IMAGE_TAG:-main}
     logging:
       driver: "json-file"
       options:
