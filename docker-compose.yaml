@@ -35,15 +35,14 @@ services:
           max-size: "10m"
     env_file:
       - ".env"
-    ports:
-      - "${LOCAL_TAILSCALE_IP}:8501:8501"
-      - "127.0.0.1:8501:8501"
-      - "127.0.1.1:8501:8501"
     # environment:
     #   DB_CONNECTION: "mongodb://mongodb:27017"
-    command: bash -c "streamlit run Podping.py"
+    # Reachable only on the traefik-dave network, as http://rc_dash:8501.
+    command: bash -c "streamlit run Podping.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false"
     restart: unless-stopped
-    network_mode: host
+    networks:
+      - traefik-dave
+      - repl-mongo_default
     extra_hosts:
       - "gad-v4vapp.tail400e5.ts.net:100.85.133.47"
       - "dave-v4vapp.tail400e5.ts.net:100.102.211.2"
@@ -51,6 +50,8 @@ services:
       - "adam-v4vapp.tail400e5.ts.net:100.125.51.61"
 
 networks:
+  traefik-dave:
+    external: true
   repl-mongo_default:
     external: true
     # networks:
