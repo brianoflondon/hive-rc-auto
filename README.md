@@ -12,6 +12,8 @@ The project uses [uv](https://docs.astral.sh/uv/) and Python 3.14.
 uv sync
 cp sample.env .env   # then fill in real values
 uv run pytest tests/test_rc_delegation/test_rc_delegation.py::test_mill tests/test_rc_delegation/test_rc_account_model.py
+uv run ruff check
+uv run ruff format
 ```
 
 Run the dashboard from `src` so Streamlit finds `pages/` and the icon path:

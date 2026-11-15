@@ -289,8 +289,9 @@ async def send_custom_json(
         logging.info(f"https://hive.ausbit.dev/tx/{trx.get('id')}")
         logging.info(f"https://hiveblocks.com/tx/{trx.get('id')}")
         logging.info(payload)
-        if trx:
-            return HiveTrx.model_validate(trx)
+        if not trx:
+            return None
+        return HiveTrx.model_validate(trx)
 
     except RPCNodeException as ex:
         logging.error(f"send_custom_json error: {ex}")
@@ -303,7 +304,8 @@ async def send_custom_json(
             ):
                 logging.info(ex.raw_body["error"]["message"])
                 logging.info("No changes to delegation")
-            elif re.match(
+                return None
+            if re.match(
                 r"plugin exception.*custom json.*",
                 ex.raw_body["error"]["message"],
             ):
@@ -311,8 +313,7 @@ async def send_custom_json(
                 logging.info("Unhandled RPC error")
                 client.next_node()
                 raise ex
-            else:
-                raise ex
+            raise ex
         except KeyError, AttributeError:
             logging.error(f"{ex}")
             logging.info("Non standard error message from RPC Node")

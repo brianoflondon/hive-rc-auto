@@ -26,10 +26,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "black>=24.10",
-    "flake8>=7.1",
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
+    "ruff>=0.17.5",
 ]
 notebooks = [
     "ipykernel>=6.29",
@@ -44,6 +43,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hive_rc_auto"]
+
+[tool.ruff]
+line-length = 99
+
+[tool.ruff.lint]
+# Flake8's rule set. Leaving select unset uses Ruff 0.17's much larger default.
+select = ["E", "F", "W"]
+ignore = ["E501"]
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
