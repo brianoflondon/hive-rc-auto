@@ -1,6 +1,6 @@
 [project]
 name = "hive-rc-auto"
-version = "1.8.0"
+version = "2.0.0"
 description = "A system for managing RC Resource Credits on Hive"
 readme = "README.md"
 license = "MIT"
