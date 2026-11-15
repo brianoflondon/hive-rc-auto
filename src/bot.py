@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from typing import List
 
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
+from pymongo import AsyncMongoClient
 from pymongo.errors import DuplicateKeyError, ServerSelectionTimeoutError
 
 from hive_rc_auto.helpers.config import Config
@@ -49,7 +49,7 @@ async def keep_publishing_price_feed():
 async def check_db():
     logging.info(Config.DB_CONNECTION)
     try:
-        server_info = await AsyncIOMotorClient(
+        server_info = await AsyncMongoClient(
             Config.DB_CONNECTION, serverSelectionTimeoutMS=5000
         ).server_info()
     except ServerSelectionTimeoutError as ex:

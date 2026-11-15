@@ -1,6 +1,6 @@
 import streamlit as st
 import httpx
-from hive_rc_auto.helpers.markdown.static_text import import_text
+from hive_rc_auto.helpers.markdown.static_text import import_text, show_built_on_hive
 
 ALL_MARKDOWN = import_text()
 
@@ -20,4 +20,5 @@ if resp.status_code == 200:
     st.markdown(resp.text, unsafe_allow_html=True)
 
 st.sidebar.markdown("# Pingslurp")
+show_built_on_hive()
 st.markdown(ALL_MARKDOWN["home_page"], unsafe_allow_html=True)

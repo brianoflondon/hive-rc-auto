@@ -1,8 +1,7 @@
 import asyncio
-import os
-from datetime import datetime, timedelta, timezone
+from collections import OrderedDict
+from datetime import UTC, datetime, timedelta
 from timeit import default_timer as timer
-from typing import OrderedDict, Tuple
 
 import httpx
 import pandas as pd
@@ -10,12 +9,12 @@ import streamlit as st
 import xmltodict
 from pymongo import MongoClient
 
-from hive_rc_auto.helpers.markdown.static_text import import_text
+from hive_rc_auto.helpers.config import Config
+from hive_rc_auto.helpers.markdown.static_text import import_text, show_built_on_hive
 from hive_rc_auto.helpers.podcastindex import get_podcast_index_info
 
 ALL_MARKDOWN = import_text()
-DB_CONNECTION = os.getenv("PINGSLURP_DB_CONNECTION")
-CLIENT = MongoClient(DB_CONNECTION)
+CLIENT = MongoClient(Config.PINGSLURP_DB_CONNECTION)
 
 st.set_page_config(
     page_title="Duplicated Feeds",
@@ -38,40 +37,37 @@ duplicate_count = st.sidebar.slider(
 )
 
 
-start_date = datetime.now(timezone.utc) + timedelta(hours=start_hours)
-end_data = datetime.now(timezone.utc) + timedelta(hours=end_hours)
+start_date = datetime.now(UTC) + timedelta(hours=start_hours)
+end_data = datetime.now(UTC) + timedelta(hours=end_hours)
 
-result = CLIENT["pingslurp"]["all_podpings"].aggregate(
-    [
-        {
-            "$match": {
-                "$and": [
-                    {"timestamp": {"$gt": start_date}},
-                    {"timestamp": {"$lt": end_data}},
-                ]
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$iris",
-                "includeArrayIndex": "iri_pos",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {"$group": {"_id": "$iris", "count": {"$sum": 1}}},
-        {"$match": {"count": {"$gte": duplicate_count}}},
-        {"$sort": {"count": -1}},
-    ]
-)
+result = CLIENT["pingslurp"]["all_podpings"].aggregate([
+    {
+        "$match": {
+            "$and": [
+                {"timestamp": {"$gt": start_date}},
+                {"timestamp": {"$lt": end_data}},
+            ]
+        }
+    },
+    {
+        "$unwind": {
+            "path": "$iris",
+            "includeArrayIndex": "iri_pos",
+            "preserveNullAndEmptyArrays": True,
+        }
+    },
+    {"$group": {"_id": "$iris", "count": {"$sum": 1}}},
+    {"$match": {"count": {"$gte": duplicate_count}}},
+    {"$sort": {"count": -1}},
+])
 st.sidebar.markdown(ALL_MARKDOWN["duplicated_feeds"])
-st.header(
-    f"List of feeds with more than {duplicate_count} podpings in {num_hours} hours."
-)
+show_built_on_hive()
+st.header(f"List of feeds with more than {duplicate_count} podpings in {num_hours} hours.")
 
 
 df = pd.DataFrame(result)
 df.rename(columns={"_id": "iri"}, inplace=True)
-df.set_index("count", inplace=True)
+df = df.set_index("count")
 print(df)
 st.dataframe(df)
 
@@ -132,7 +128,7 @@ def get_feed_image(feed_xml: OrderedDict) -> str | None:
             return None
 
 
-async def lookup_iri(iri: str) -> Tuple[str, str]:
+async def lookup_iri(iri: str) -> tuple[str, str]:
     async with httpx.AsyncClient() as client:
         user_agent = {"User-agent": "Pingslurp for Podping"}
         try:

@@ -10,6 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "python": "${workspaceFolder}/.venv/bin/python",
             "justMyCode": true
         },
         {
@@ -18,6 +19,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/src/bot.py",
             "console": "integratedTerminal",
+            "python": "${workspaceFolder}/.venv/bin/python",
             "justMyCode": true
         },
         {
@@ -27,6 +29,7 @@
             "module": "streamlit",
             "cwd": "${workspaceFolder}/src/",
             "envFile": "${workspaceFolder}/.env",
+            "python": "${workspaceFolder}/.venv/bin/python",
             "args": [
                 "run",
                 "Podping.py"
