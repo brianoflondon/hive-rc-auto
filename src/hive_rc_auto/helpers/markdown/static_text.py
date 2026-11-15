@@ -6,7 +6,7 @@ import streamlit as st
 
 ALL_MARKDOWN = {}
 
-HIVE_LINK = "[This project built on Hive](https://hive.io)"
+HIVE_LINK = "[This project is lovingly built on Hive](https://hive.io)"
 
 
 def show_built_on_hive() -> None:
