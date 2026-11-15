@@ -7,7 +7,7 @@ import streamlit as st
 from pymongo import MongoClient
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.markdown.static_text import import_text
+from hive_rc_auto.helpers.markdown.static_text import import_text, show_built_on_hive
 
 ALL_MARKDOWN = import_text()
 
@@ -99,9 +99,10 @@ df_total["avg4H"] = df_total["total_iris"].rolling(window="4h", center=True).mea
 df_total["avg8H"] = df_total["total_iris"].rolling(window="8h", center=True).mean()
 df_total["avg24H"] = df_total["total_iris"].rolling(window="24h", center=True).mean()
 
+# Latest timestamp per host. $max keeps one value per host. Sorting the
+# whole collection spills to disk, and the volume is under Mongo's 500 MB minimum.
 result_recent_ping = CLIENT["pingslurp"]["hosts_ts"].aggregate([
-    {"$sort": {"timestamp": -1}},
-    {"$group": {"_id": "$metadata.host", "timestamp": {"$first": "$timestamp"}}},
+    {"$group": {"_id": "$metadata.host", "timestamp": {"$max": "$timestamp"}}},
 ])
 df_recent_ping = pd.DataFrame(result_recent_ping)
 df_recent_ping["age"] = naive_utcnow() - df_recent_ping["timestamp"]
@@ -161,13 +162,12 @@ df_summary = pd.DataFrame(data=summary)
 
 
 def gauge(host: str):
-    value = int(df_summary[df_summary.host == host].hour_1)
-    reference = int(df_summary[df_summary.host == host].hour_2)
-    min_val = int(df_summary[df_summary.host == host].min_val)
-    max_val = int(df_summary[df_summary.host == host].max_val)
-    avg4H = int(df_summary[df_summary.host == host].avg4H)
-    avg8H = int(df_summary[df_summary.host == host].avg8H)
-    avg24H = int(df_summary[df_summary.host == host].avg24H)
+    row = df_summary.loc[df_summary.host == host].iloc[0]
+    value = int(row.hour_1)
+    reference = int(row.hour_2)
+    min_val = int(row.min_val)
+    max_val = int(row.max_val)
+    avg8H = int(row.avg8H)
     fig = go.Figure(
         go.Indicator(
             mode="gauge+number+delta",
@@ -216,6 +216,7 @@ top_cols[1].plotly_chart(fig, width="stretch")
 top_cols[1].subheader("Total")
 st.sidebar.plotly_chart(fig, width="stretch")
 st.sidebar.subheader("Total")
+show_built_on_hive()
 cols = st.columns(ncol)
 
 

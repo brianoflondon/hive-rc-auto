@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 from pymongo import MongoClient
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.markdown.static_text import import_text
+from hive_rc_auto.helpers.markdown.static_text import import_text, show_built_on_hive
 from hive_rc_auto.helpers.pingslurp_accounts import (
     dataframe_all_transactions_by_account,
 )
@@ -301,6 +301,7 @@ if __name__ == "__main__":
     hours_selectbox()
     size_selectbox()
     st.sidebar.markdown(ALL_MARKDOWN["rc_overview"])
+    show_built_on_hive()
     # try:
     main_loop()
 

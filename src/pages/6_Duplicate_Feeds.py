@@ -10,7 +10,7 @@ import xmltodict
 from pymongo import MongoClient
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.markdown.static_text import import_text
+from hive_rc_auto.helpers.markdown.static_text import import_text, show_built_on_hive
 from hive_rc_auto.helpers.podcastindex import get_podcast_index_info
 
 ALL_MARKDOWN = import_text()
@@ -61,6 +61,7 @@ result = CLIENT["pingslurp"]["all_podpings"].aggregate([
     {"$sort": {"count": -1}},
 ])
 st.sidebar.markdown(ALL_MARKDOWN["duplicated_feeds"])
+show_built_on_hive()
 st.header(f"List of feeds with more than {duplicate_count} podpings in {num_hours} hours.")
 
 

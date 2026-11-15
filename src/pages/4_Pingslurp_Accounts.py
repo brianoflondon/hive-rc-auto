@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 from pymongo import MongoClient
 
 from hive_rc_auto.helpers.config import Config
-from hive_rc_auto.helpers.markdown.static_text import import_text
+from hive_rc_auto.helpers.markdown.static_text import import_text, show_built_on_hive
 from hive_rc_auto.helpers.pingslurp_accounts import (
     dataframe_all_transactions_by_account,
     dataframe_all_transactions_no_account,
@@ -113,6 +113,7 @@ st.session_state.time_range = time_range_options[st.session_state.time_range_cho
 st.session_state.time_range_days = int(st.session_state.time_range_choice.split()[0])
 
 st.sidebar.markdown(ALL_MARKDOWN["pingslurp_accounts"])
+show_built_on_hive()
 choice = st.session_state.metric
 
 metric = metrics_options[choice]
