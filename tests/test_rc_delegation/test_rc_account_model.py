@@ -64,6 +64,28 @@ def test_high_mana_on_a_receiving_account(monkeypatch):
     assert account.db_format["delegating"] == "target"
 
 
+def test_new_delegation_is_an_int(monkeypatch):
+    monkeypatch.setattr(Config, "DELEGATING_ACCOUNTS", ["podping"])
+    monkeypatch.setattr(Config, "RC_PCT_LOWER_TARGET", 80)
+    monkeypatch.setattr(Config, "RC_PCT_UPPER_TARGET", 95)
+    monkeypatch.setattr(Config, "RC_PCT_ALARM_LEVEL", 40)
+    monkeypatch.setattr(Config, "RC_BASE_LEVEL", 1_000)
+    monkeypatch.setattr(Config, "UPDATE_FREQUENCY_SECS", 300)
+    monkeypatch.setattr(Config, "VOTING_MANA_REGENERATION_IN_SECONDS", 5 * 24 * 3600)
+    monkeypatch.setattr(Config, "TESTNET", False)
+
+    account = _account(50, 10_000_000_000_000, received_delegated_rc=1)
+    amount = account.calculate_new_delegation()
+    assert isinstance(amount, int)
+    delegation = RCDirectDelegation.model_validate({
+        "from": "podping",
+        "to": account.account,
+        "delegated_rc": amount,
+        "cut": False,
+    })
+    assert delegation.delegated_rc == amount
+
+
 def test_delegation_aliases_and_header():
     delegation = RCDirectDelegation.model_validate({
         "from": "podping",

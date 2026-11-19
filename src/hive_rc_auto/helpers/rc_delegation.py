@@ -292,14 +292,14 @@ class RCAccount(BaseModel):
         """
         if self.status == RCStatus.LOW:
             percent_gap = Config.RC_PCT_LOWER_TARGET - self.real_mana_percent
-            new_amount = self.max_rc * (1 + ((percent_gap) / 100))
+            new_amount = self.max_rc * (1 + (percent_gap / 100))
             if new_amount < Config.MINIMUM_DELEGATION:
-                new_amount = 0
-            return new_amount
+                return 0
+            return round(new_amount)
         if self.status == RCStatus.HIGH and self.delta_percent > 0:
             percent_gap = (self.real_mana_percent - Config.RC_PCT_UPPER_TARGET) + 2
-            delta = -(self.max_rc * ((percent_gap) / 100)) * 1.3
-            return delta
+            delta = -(self.max_rc * (percent_gap / 100)) * 1.3
+            return round(delta)
         return 0
 
     @property
