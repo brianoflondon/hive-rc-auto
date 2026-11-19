@@ -48,6 +48,14 @@ docker compose up -d
 
 The image workdir is `/app`, with `bot.py` and `Podping.py` on the path, so the compose commands stay `python bot.py` and `streamlit run Podping.py`. `.env` is not baked into the image. Compose injects it at runtime.
 
+`rc_bot` joins the external Docker network `repl-mongo_default`. Compose maps the replica-set names onto their Tailscale addresses, so `dave-v4vapp.tail400e5.ts.net` is `100.102.211.2` inside the container. That address is Dave itself. When Dave is the primary, the bot has to open port `27017` on the host from the Docker bridge (`172.16.0.0/12`). UFW drops that path unless it is allowed. Dave already allows this range to port `8501`. Mongo needs the same exception:
+
+```sh
+sudo ufw allow from 172.16.0.0/12 to any port 27017 proto tcp comment 'docker to local mongo'
+```
+
+Without that rule the bot reaches the other replica members, sees no primary, and exits.
+
 To build the image on this machine instead:
 
 ```bash
